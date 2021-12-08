@@ -137,7 +137,7 @@ class BayesNet:
         """
         Get all the entries of a CPT which are compatible with the instantiation.
 
-        :param instantiation: a series of assignments as tuples. E.g.: pd.Series(("A", True), ("B", False))
+        :param instantiation: a series of assignments as tuples. E.g.: pd.Series({"A": True, "B": False})
         :param cpt: cpt to be filtered
         :return: table with compatible instantiations and their probability value
         """
@@ -162,7 +162,7 @@ class BayesNet:
         Creates and returns a new factor in which all probabilities which are incompatible with the instantiation
         passed to the method to 0.
 
-        :param instantiation: a series of assignments as tuples. E.g.: pd.Series({"A", True}, {"B", False})
+        :param instantiation: a series of assignments as tuples. E.g.: pd.Series({"A": True, "B": False})
         :param cpt: cpt to be reduced
         :return: cpt with their original probability value and zero probability for incompatible instantiations
         """
