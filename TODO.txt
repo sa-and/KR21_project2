@@ -1,0 +1,20 @@
+We need to implement the following things into "BNReasoner.py"
+
+
+-d-seperation function, that determines whether something is d-seperated (input x,z,y)
+
+-Ordering: Given a set of variables X in the Bayesian network, compute a good ordering for elimination of X based on the min-degree heuristics (2pts) and the min-fill heuristics (2pts).
+(Hint: you get the interaction graph ”for free” from the BayesNet class )
+
+-network pruning: Given a set of query variables Q and evidence E, node- and edge-prune the Bayesian network s.t. queries of the form P (Q|E) can still be correctly calculated
+
+-Marginal Distributions: Given query variables Q and a possibly empty evidence E, compute the marginal distribution P (Q|E) (12pts). 
+(Note that Q is a subset of the variables in the Bayesian network X with Q ⊂X but can also be Q = X.)
+
+-MAP and MEP: Given a possibly empty set of query variables Q and an evidence E, compute the most likely instantiations of Q (12pts).
+
+Make sure to also provide some test cases in which you show that your methods work. For that, you
+can use the example Bayesian networks which you can find in the ”testing” folder. This includes two
+examples from the lecture as well as an extra example. It is not allowed to use already existing packages
+for inference on Bayesian networks to accomplish the tasks. Along with the report, you have to submit
+you code.
