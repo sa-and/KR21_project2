@@ -1,6 +1,7 @@
 from typing import Union
 from BayesNet import BayesNet
 
+import ordering_func
 
 class BNReasoner:
     def __init__(self, net: Union[str, BayesNet]):
@@ -19,9 +20,19 @@ class BNReasoner:
         ## here we check for d-seperation
         return
     
-    def ordering(self, network, x):
+    def ordering(self, network, x, order_type):
         ## order x based on min-fill and min-degree heuristics
-        return
+        output = None
+        if (order_type == 'random'):
+            output = ordering_func.random_sort(x)
+        elif (order_type == 'min-degree'):
+            graph = self.bn.get_interaction_graph()
+            output = ordering_func.sort_min_degree(graph,x)
+        else:
+            graph = self.bn.get_interaction_graph()
+            output = ordering_func.sort_min_fill(graph,x)
+        
+        return output
     
     def networkPruning(self, network, q, e): ## set of variables Q and evidence E
         ##
