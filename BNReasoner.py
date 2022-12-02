@@ -40,4 +40,21 @@ class BNReasoner:
         self.bn.draw_structure()
 
 reasoner = BNReasoner("./testing/dog_problem.BIFXML")
-reasoner.pruneNetwork(evidence={"dog-out": True})
+cpts = reasoner.bn.get_all_cpts()
+#reasoner.bn.draw_structure()
+variable = 'dog-out'
+#cpts['dog-out'].columns.drop(['dog-out','p'])
+df = cpts[variable]
+res = pd.DataFrame(columns = df.columns.drop([variable]))
+
+for i in range(len(df['family-out'])):
+    if i % 2 == 0:
+        max = df.loc[i,'p']
+    else:
+        if df.loc[i,'p'] > max:
+            max = df.loc[i,'p']
+        print(max)
+        maxres = df.drop([variable,'p'], axis = 1).loc[i,:]
+        maxres['p'] = max
+        print(maxres)
+        res = pd.concat([res,pd.DataFrame(maxres)], axis = 0)
