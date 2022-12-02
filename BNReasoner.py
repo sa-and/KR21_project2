@@ -14,5 +14,7 @@ class BNReasoner:
             self.bn.load_from_bifxml(net)
         else:
             self.bn = net
-
     # TODO: This is where your methods should go
+
+net = BNReasoner("C:/Users/Bart/Documents/GitHub/KR21_project2/testing/dog_problem.BIFXML")
+BayesNet.draw_structure(net.bn)
