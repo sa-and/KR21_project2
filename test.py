@@ -8,7 +8,7 @@ if __name__ == "__main__":
     bn.load_from_bifxml(net)
     #bn.draw_structure()
     bnr = BNReasoner(bn)
-    outcome = bnr.pruning({'Rain?': False,'Winter?':True})
+    outcome = bnr.pruning(["Wet Grass?"],{'Rain?': False,'Winter?':True})
     #outcome.draw_structure()
 
 
