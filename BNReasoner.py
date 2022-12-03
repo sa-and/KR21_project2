@@ -1,6 +1,6 @@
-from typing import Union
+from typing import Union, Dict, List
 from BayesNet import BayesNet
-
+from copy import deepcopy
 
 class BNReasoner:
     def __init__(self, net: Union[str, BayesNet]):
@@ -16,12 +16,11 @@ class BNReasoner:
             self.bn = net
 
     # TODO: This is where your methods should go
-    def pruning(self, values: Dict[str, bool]) -> BayesNet:
+    def pruning(self,query: List[str], values: Dict[str, bool]) -> BayesNet:
         """ Prune the network, will drop variables that are not needed anymore
-
         Args:
+            query (List): Given query, used to check if nodes are part of it
             values (Dict): The given evedince to a node, must be True or False. Structure: {Node:Value}
-
         Returns:
             p: BayesNet.object, returns the new pruned network
         """
@@ -31,6 +30,10 @@ class BNReasoner:
         all_cpts = p.get_all_cpts() # A dictionary of all cps in the network indexed by the variable they belong to
         while finished: # Stop pruning when the network cannot be pruned further
             finished = False
+            for var in p.get_all_variables(): 
+                if p.get_children(var) == [] and var not in query and var not in values: # Check if node is part of query
+                    p.del_var(var) # Delete node if not part of query
+                    finished = True
             for a, b in values.items(): # Get node name and value
                 for variable in p.get_all_variables(): # Get all variables
                     cpt = all_cpts[variable]
@@ -44,3 +47,4 @@ class BNReasoner:
                     finished = True
         print(p.get_all_cpts()," dit is p")
         return p
+
