@@ -21,8 +21,8 @@ class BNReasoner_:
     def Network_Pruning(self, bn, Q, e, evidence=pd.Series(dtype=object)):
         '''
         :param bn: Bayesnetwork
-        :param Q: (query) list of variables, in case of d-separation the var of which you want to know whether they are d-separated
-        :param e: the set of evidence, is list of (evidence) variables or when used to check whether X and Y are d-separation by Z, is this Z
+        :param Q: (query) set of variables, in case of d-separation the var of which you want to know whether they are d-separated
+        :param e: the set of evidence variables or when used to check whether X and Y are d-separation by Z, is this Z
         :param evidence: a series of assignments as tuples. E.g.: pd.Series({"A": True, "B": False}), containing the assignments of the evidence. 
                 It is not obligated, therefor this function is usable for d-separation, without knowing the assignment of the Z
         :return: pruned network
@@ -32,7 +32,7 @@ class BNReasoner_:
 
         #Get edges between nodes by asking for children, which are saved in a list (children)
         for u in e:
-            children[u] = (BayesNet.get_children(bn, u)) 
+            children[u] = BayesNet.get_children(bn, u)
         
         #Edge Pruning  
         #Remove edges between evidence and children
@@ -60,7 +60,7 @@ class BNReasoner_:
     def d_separation(self, bn, X, Y, Z):
         '''
         :param bn: Bayes network
-        :param X, Y, Z: sets of var (lists) of which you want to know whether they are d-separated by Z
+        :param X, Y, Z: sets of var of which you want to know whether they are d-separated by Z
         :returns: True if X and Y are d-separated, False if they are not d-separated by Z
         '''        
         q = X.union(Y)
@@ -85,9 +85,29 @@ class BNReasoner_:
                 else:
                     return self.loop_over_children(bn, y, child)    
 
+    def independence(self, bn, X, Y, Z):
+        '''
+        Implementation of Markov Property
+        :param bn: Bayesian Network
+        :param X, Y, Z: sets of variable of which to decide whether X is independent of Y given Z
+        :returns: Bool, True if X and Y are independent given Z, False if X and Y are not independent given Z 
+        '''
+        child_of_z = []
+        for z in Z:
+            child_of_z = child_of_z + BayesNet.get_children(bn, z)
+        for x in X:
+            if x in child_of_z: 
+                for y in Y:
+                    if not self.loop_over_children(bn, y, x):
+                        return False
+            else:
+                return False
+        return True
 
 Pruning = False
 check_d_separation = False
+Independence = False
+
 
 #We need to make new BN for d-separation and pruning as the bn is adjusted in these functions
 
@@ -111,7 +131,20 @@ if check_d_separation:
     else:
         print(X, "is not d-separated from ", Y, "by ", Z)
 
-BayesNet.draw_structure(bnreasoner.bn)
+if Independence:
+    #Ik weet niet zeker of de implementatie van independence compleet is, maar de Markov Property is geimplementeerd, I guess
+    bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
+    Y = {"Sprinkler?"}
+    X = {"Wett Grass?"}
+    Z = {"Winter?"} 
+    if bnreasoner.independence(bnreasoner.bn, X,Y,Z):
+        print(X, "is independent from ", Y, "given ", Z)
+    else:
+        print(X, "is not independent from ", Y, "given ", Z)
+
+
+
+
 
 
 
