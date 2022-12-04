@@ -39,5 +39,25 @@ class BNReasoner:
             self.bn.del_var(ev)
         self.bn.draw_structure()
 
+
+    def variable_elimination(self, evidence=dict()):
+        print(evidence)
+        cpts = self.bn.get_all_cpts()
+        instantiation = pd.Series(evidence)
+        self.bn.draw_structure()
+        print(cpts)
+        ##hiervoor heb ik elemination order nodig
+
+        #order = elimenation_order()
+
+        #reduce_factor(instantiation,cpts)
+
+
+
+
+
+
+
 reasoner = BNReasoner("./testing/dog_problem.BIFXML")
-reasoner.pruneNetwork(evidence={"dog-out": True})
+#reasoner.pruneNetwork(evidence={"dog-out": True})
+reasoner.variable_elimination(evidence={"dog-out": True})
