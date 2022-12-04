@@ -227,6 +227,8 @@ class BayesNet:
         """
         self.structure.remove_edge(edge[0], edge[1])
 
+    # CUSTOM METHODS ----------------------------------------------------------
+
     def out_edges(self, node: str) -> List:
         """
         Returns a list of outgoing edges from the given node
@@ -234,3 +236,11 @@ class BayesNet:
         :return: A list of tuples representing the outgoing edges
         """
         return self.structure.edges(node)
+    
+    def all_reachable(self, node):
+        """
+        Returns a list of nodes reachable from the given node
+        :param node: A string for the name of the node
+        :return: A list of nodes reachable from the given one
+        """
+        return list(nx.shortest_path(self.structure.to_undirected(), node).keys())

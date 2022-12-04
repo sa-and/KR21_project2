@@ -28,7 +28,7 @@ class BNReasoner:
             for edge in list(self.bn.out_edges(node)):
                 self.bn.del_edge(edge)
         
-        # Node pruning - delete any leaf node that does not appear in Q or e
+        # Node pruning - iteratively delete any leaf nodes that do not appear in Q or e
         node_deleted = True
         while node_deleted:
             node_deleted = False
@@ -37,7 +37,36 @@ class BNReasoner:
                     self.bn.del_var(node)
                     node_deleted = True
                     break
-                
+    
+    def is_dsep(self, X, Y, Z):
+        """
+        Given three sets of variables X, Y, and Z, determine whether X is d-separated of Y given Z.
+        """
+        # Delete all outgoing edges from nodes in Z
+        for node in Z:
+            for edge in list(self.bn.out_edges(node)):
+                self.bn.del_edge(edge)
+            
+        # Iteratively delete any leaf nodes that are not in X, Y or Z
+        node_deleted = True
+        while node_deleted:
+            node_deleted = False
+            for node in self.bn.get_all_variables():
+                if len(self.bn.out_edges(node)) == 0 and (node not in [*X, *Y, *Z]):
+                    self.bn.del_var(node)
+                    node_deleted = True
+                    break
+        
+        # If X and Y are disconnected, then they are d-separated by Z
+        Y = set(Y)
+        for x in X:
+            reachable_nodes = set(self.bn.all_reachable(x))
+            intersection = Y.intersection(reachable_nodes)
+            if len(intersection) != 0:
+                return False
+        
+        return True
+
     def compute_factor(self):
         pass
     
