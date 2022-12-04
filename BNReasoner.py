@@ -1,6 +1,8 @@
 from typing import Union
 from BayesNet import BayesNet
 import pandas as pd
+import copy
+import numpy as np
 
 class BNReasoner:
     def __init__(self, net: Union[str, BayesNet]):
@@ -72,7 +74,49 @@ class BNReasoner:
                     df['p'] = mul
                     res = pd.concat([res, df])
         return res
-
-reasoner = BNReasoner("./testing/dog_problem.BIFXML")
-a = reasoner.bn.get_interaction_graph()
+    def Ordering(self, heuristic):
+        if heuristic == 'min-degree':
+            degrees = dict(self.bn.get_interaction_graph().degree)
+            graph = copy.deepcopy(self.bn.get_interaction_graph().adj)
+            order = []
+            for i in range(len(degrees)):
+                e = min(degrees, key=degrees.get)
+                order += [e]
+                new_edges = []
+                for j in graph:
+                    if e in graph[j]:
+                        if j in degrees:
+                            degrees[j] -= 1
+                            new_edges += [j]
+                for ne in range(len(new_edges) - 1):
+                    for ae in range(ne + 1, len(new_edges)):
+                        if new_edges[ae] not in graph[new_edges[ne]]:
+                            print('adding', ne)
+                            degrees[ne] += 1
+                del degrees[e]
+            return order
+        elif heuristic == 'min-fill':
+            graph = copy.deepcopy(self.bn.get_interaction_graph().adj)
+            nodes = list(self.bn.get_interaction_graph().nodes)
+            order = []
+            for i in range(len(nodes)):
+                minimal = np.inf
+                for n in nodes:
+                    n_edges = 0
+                    new_edges = []
+                    for g in graph:
+                        if n in graph[g]:
+                            new_edges += [g]
+                    for ne in range(len(new_edges) - 1):
+                        for ae in range(ne + 1, len(new_edges)):
+                            if new_edges[ae] not in graph[new_edges[ne]]:
+                                n_edges += 1
+                    if minimal > n_edges:
+                        minimal = n_edges
+                        add = n
+                order += [add]
+                nodes.remove(add)
+            return order
+        else:
+            print('wrong heuristic chosen, pick either min-degree or min-fill')
 
