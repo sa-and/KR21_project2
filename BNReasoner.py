@@ -38,23 +38,41 @@ class BNReasoner:
                     self.bn.del_var(child)
             self.bn.del_var(ev)
         self.bn.draw_structure()
+    def maxingOut(self, variable):
+        cpts = self.bn.get_all_cpts()
+        df = cpts[variable]
+        res = pd.DataFrame(columns=df.columns.drop([variable]))
+
+        for i in range(len(df['family-out'])):
+            if i % 2 == 0:
+                max = df.loc[i:i, ['p', variable]]
+            else:
+                if df.loc[i, 'p'] > max.iloc[0, 0]:
+                    max = df.loc[i:i, ['p', variable]]
+                maxres = df.drop([variable, 'p'], axis=1).loc[i:i, :]
+                maxres['p'] = max.iloc[0, 0]
+                maxres['ins. of ' + variable] = max.iloc[0, 1]
+                res = pd.concat([res, maxres], axis=0, sort=False, ignore_index=True)
+        return res
+
+    def factorMultiplication(self, factor1, factor2):
+        cpts = reasoner.bn.get_all_cpts()
+        X = cpts[factor1]
+        Z = cpts[factor2]
+        union = list(set(X.columns).intersection(Z.columns))
+        union.remove('p')
+        cols = list(pd.concat([X, Z]).columns)
+        cols.remove('p')
+        res = pd.DataFrame(columns=cols + ['p'])
+        for x in range(len(X.iloc[:, 0])):
+            for z in range(len(Z.iloc[:, 0])):
+                if X.loc[x, union[0]] == Z.loc[z, union[0]]:
+                    mul = X.loc[x, 'p'] * Z.loc[z, 'p']
+                    df = pd.merge(X.loc[x:x, X.columns != 'p'], Z.loc[z:z, Z.columns != 'p'])
+                    df['p'] = mul
+                    res = pd.concat([res, df])
+        return res
 
 reasoner = BNReasoner("./testing/dog_problem.BIFXML")
-cpts = reasoner.bn.get_all_cpts()
-#reasoner.bn.draw_structure()
-variable = 'dog-out'
-#cpts['dog-out'].columns.drop(['dog-out','p'])
-df = cpts[variable]
-res = pd.DataFrame(columns = df.columns.drop([variable]))
+a = reasoner.bn.get_interaction_graph()
 
-for i in range(len(df['family-out'])):
-    if i % 2 == 0:
-        max = df.loc[i,'p']
-    else:
-        if df.loc[i,'p'] > max:
-            max = df.loc[i,'p']
-        print(max)
-        maxres = df.drop([variable,'p'], axis = 1).loc[i,:]
-        maxres['p'] = max
-        print(maxres)
-        res = pd.concat([res,pd.DataFrame(maxres)], axis = 0)
