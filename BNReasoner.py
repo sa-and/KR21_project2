@@ -58,7 +58,7 @@ class BNReasoner:
         return res
 
     def factorMultiplication(self, factor1, factor2):
-        cpts = reasoner.bn.get_all_cpts()
+        cpts = self.bn.get_all_cpts()
         X = cpts[factor1]
         Z = cpts[factor2]
         union = list(set(X.columns).intersection(Z.columns))
