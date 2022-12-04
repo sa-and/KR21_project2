@@ -93,21 +93,24 @@ class BNReasoner_:
         :returns: Bool, True if X and Y are independent given Z, False if X and Y are not independent given Z 
         '''
         child_of_z = []
-        for z in Z:
-            child_of_z = child_of_z + BayesNet.get_children(bn, z)
-        for x in X:
-            if x in child_of_z: 
-                for y in Y:
-                    if not self.loop_over_children(bn, y, x):
+        for x in X: 
+            for parent in BayesNet.get_all_variables(bn):
+                if x in BayesNet.get_children(bn, parent):
+                    if parent not in Z:
                         return False
-            else:
-                return False
+        for x in X:
+            for y in Y:
+                if not self.loop_over_children(bn, y, x):
+                    return False 
+                if not self.loop_over_children(bn, x, y):
+                    return False
         return True
-
+    
+   
 Pruning = False
 check_d_separation = False
-Independence = False
-
+Independence = True #False
+# Marginalization = True
 
 #We need to make new BN for d-separation and pruning as the bn is adjusted in these functions
 
@@ -134,9 +137,9 @@ if check_d_separation:
 if Independence:
     #Ik weet niet zeker of de implementatie van independence compleet is, maar de Markov Property is geimplementeerd, I guess
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
-    Y = {"Sprinkler?"}
-    X = {"Wett Grass?"}
-    Z = {"Winter?"} 
+    Y = {"Slippery Road?"}
+    X = {"Wet Grass?"}
+    Z = {"Rain?"} 
     if bnreasoner.independence(bnreasoner.bn, X,Y,Z):
         print(X, "is independent from ", Y, "given ", Z)
     else:
@@ -144,6 +147,7 @@ if Independence:
 
 
 
+# BayesNet.draw_structure(bnreasoner.bn)
 
 
 
