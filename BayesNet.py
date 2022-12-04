@@ -226,3 +226,11 @@ class BayesNet:
         :param edge: Edge to be deleted (e.g. ('A', 'B')).
         """
         self.structure.remove_edge(edge[0], edge[1])
+
+    def out_edges(self, node: str) -> List:
+        """
+        Returns a list of outgoing edges from the given node
+        :param node: A string for the name of the node
+        :return: A list of tuples representing the outgoing edges
+        """
+        return self.structure.edges(node)
