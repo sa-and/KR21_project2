@@ -66,6 +66,12 @@ class BNReasoner:
                 return False
         
         return True
+    
+    def is_independent(self, X, Y, Z):
+        """
+        Given three sets of variables X, Y, and Z, determine whether X is independent of Y given Z
+        """
+        return self.is_dsep(X, Y, Z)
 
     def compute_factor(self):
         pass
