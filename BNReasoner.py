@@ -33,7 +33,7 @@ class BNReasoner:
         while node_deleted:
             node_deleted = False
             for node in self.bn.get_all_variables():
-                if len(self.bn.out_edges(node)) == 0 and (node not in [*Q, *e]):
+                if self.bn.is_leaf_node(node) and (node not in [*Q, *e]):
                     self.bn.del_var(node)
                     node_deleted = True
                     break
@@ -52,17 +52,15 @@ class BNReasoner:
         while node_deleted:
             node_deleted = False
             for node in self.bn.get_all_variables():
-                if len(self.bn.out_edges(node)) == 0 and (node not in [*X, *Y, *Z]):
+                if self.bn.is_leaf_node(node) and (node not in [*X, *Y, *Z]):
                     self.bn.del_var(node)
                     node_deleted = True
                     break
         
         # If X and Y are disconnected, then they are d-separated by Z
-        Y = set(Y)
         for x in X:
-            reachable_nodes = set(self.bn.all_reachable(x))
-            intersection = Y.intersection(reachable_nodes)
-            if len(intersection) != 0:
+            reachable_nodes = self.bn.all_reachable(x)
+            if any(node in Y for node in reachable_nodes):
                 return False
         
         return True

@@ -228,6 +228,8 @@ class BayesNet:
         self.structure.remove_edge(edge[0], edge[1])
 
     # CUSTOM METHODS ----------------------------------------------------------
+    def is_leaf_node(self, node: str) -> bool:
+        return self.structure.out_degree(node) == 0
 
     def out_edges(self, node: str) -> List:
         """
@@ -235,7 +237,7 @@ class BayesNet:
         :param node: A string for the name of the node
         :return: A list of tuples representing the outgoing edges
         """
-        return self.structure.edges(node)
+        return self.structure.out_edges(node)
     
     def all_reachable(self, node):
         """
