@@ -87,32 +87,45 @@ class BNReasoner_:
 
     def independence(self, bn, X, Y, Z):
         '''
-        Implementation of Markov Property
+        Implementation of Markov Property and Symmetry in DAGS to determine independence
         :param bn: Bayesian Network
         :param X, Y, Z: sets of variable of which to decide whether X is independent of Y given Z
         :returns: Bool, True if X and Y are independent given Z, False if X and Y are not independent given Z 
         '''
-        child_of_z = []
+        Not_all_parents_of_X = False        
         for x in X: 
             for parent in BayesNet.get_all_variables(bn):
                 if x in BayesNet.get_children(bn, parent):
                     if parent not in Z:
+                        Not_all_parents_of_X = True
+                        break
+            if Not_all_parents_of_X:
+                break
+
+        if Not_all_parents_of_X:
+            for y in Y: 
+                for parent in BayesNet.get_all_variables(bn):
+                    if y in BayesNet.get_children(bn, parent):
+                        if parent not in Z:
+                            return False 
+            for y in Y:
+                for x in X:
+                    if not self.loop_over_children(bn, x, y):
                         return False
+            return True
+
         for x in X:
             for y in Y:
                 if not self.loop_over_children(bn, y, x):
-                    return False 
-                if not self.loop_over_children(bn, x, y):
                     return False
-        return True
-    
-   
+                     
+        return True 
+         
+
+     
 Pruning = False
 check_d_separation = False
-Independence = True #False
-# Marginalization = True
-
-#We need to make new BN for d-separation and pruning as the bn is adjusted in these functions
+Independence = True
 
 if Pruning:
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
@@ -135,9 +148,11 @@ if check_d_separation:
         print(X, "is not d-separated from ", Y, "by ", Z)
 
 if Independence:
-    #Ik weet niet zeker of de implementatie van independence compleet is, maar de Markov Property is geimplementeerd, I guess
+    #Ik weet niet zeker of de implementatie van independence compleet of efficient is,
+    #maar I guess dat het werkt, het is gebaseerd op DAGs en de Markov Property en Symmetry
+    #zijn denk ik geimplementeerd.
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
-    Y = {"Slippery Road?"}
+    Y = {"Winter?"}
     X = {"Wet Grass?"}
     Z = {"Rain?"} 
     if bnreasoner.independence(bnreasoner.bn, X,Y,Z):
@@ -145,9 +160,6 @@ if Independence:
     else:
         print(X, "is not independent from ", Y, "given ", Z)
 
-
-
-# BayesNet.draw_structure(bnreasoner.bn)
 
 
 
