@@ -153,7 +153,6 @@ class BNReasoner_:
 
     def maxing_out(self,bn,X):
         '''
-        NEEDS WORK
         Given a factor and a variable X, compute the CPT in which X is maxed-out
         :param bn: Bayesian Network
         :param X: variable X
@@ -162,14 +161,13 @@ class BNReasoner_:
 
         cpt = BayesNet.get_cpt(bn,X)
         newcpt = cpt.drop([X],axis=1)
-        # print(newcpt)
 
         remaining_vars = [x for x in newcpt.columns if x != X and x != 'p']
-        # print(remaining_vars)
 
         newcpt = newcpt.groupby(remaining_vars).agg({'p': 'max'})
         newcpt.reset_index(inplace=True)
-        # print(newcpt)
+
+
         return newcpt
 
     def multiply_factors(self,f,g):
@@ -213,8 +211,8 @@ Pruning = False
 check_d_separation = False #True
 Independence = False #True
 Marginalization = False
-MaxingOut = False # THIS NEEDS SOME WORK
-MultiplyFactor = True
+MaxingOut = False
+MultiplyFactor = False
 
 if Pruning:
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
@@ -253,6 +251,11 @@ if Marginalization:
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
     X = "Wet Grass?"
     bnreasoner.marginalization(bnreasoner.bn,X)
+
+if MaxingOut:
+    bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
+    X = "Wet Grass?"
+    bnreasoner.maxing_out(bnreasoner.bn,X)
 
 if MultiplyFactor:
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
