@@ -74,6 +74,7 @@ class BNReasoner:
                     df['p'] = mul
                     res = pd.concat([res, df])
         return res
+
     def Ordering(self, heuristic):
         if heuristic == 'min-degree':
             degrees = dict(self.bn.get_interaction_graph().degree)
@@ -94,6 +95,7 @@ class BNReasoner:
                             print('adding', ne)
                             degrees[ne] += 1
                 del degrees[e]
+                print(order)
             return order
         elif heuristic == 'min-fill':
             graph = copy.deepcopy(self.bn.get_interaction_graph().adj)
@@ -119,20 +121,50 @@ class BNReasoner:
             return order
         else:
             print('wrong heuristic chosen, pick either min-degree or min-fill')
-    def variable_elimination(self, evidence=dict()):
+
+    def variableElimination(self, evidence=dict()):
         print(evidence)
         cpts = self.bn.get_all_cpts()
         instantiation = pd.Series(evidence)
         self.bn.draw_structure()
         print(cpts)
+
+        order = reasoner.Ordering('min-degree')
+        for i in order:
+            
+
         ##hiervoor heb ik elemination order nodig
 
         #order = elimenation_order()
 
         #reduce_factor(instantiation,cpts)
+        
+    def marginalDistributions(self, evidence=dict()):
+        print(evidence)
+        cpts = self.bn.get_all_cpts()
+        instantiation = pd.Series(evidence)
+        self.bn.draw_structure()
+        print(cpts)
+
+    def map(self, evidence=dict()):
+        print(evidence)
+        cpts = self.bn.get_all_cpts()
+        instantiation = pd.Series(evidence)
+        self.bn.draw_structure()
+        print(cpts)
+        #compute P(Q,e) first with variable elimination, then maximize-out Q using extended variables
+
+    def mpe(self, evidence=dict()):
+        print(evidence)
+        cpts = self.bn.get_all_cpts()
+        instantiation = pd.Series(evidence)
+        self.bn.draw_structure()
+        print(cpts)
+        #mazimize out all variables which are not in Q and e
+
 
 
 reasoner = BNReasoner("./testing/dog_problem.BIFXML")
 #reasoner.pruneNetwork(evidence={"dog-out": True})
-reasoner.variable_elimination(evidence={"dog-out": True})
-
+#reasoner.variable_elimination(evidence={"dog-out": True})
+reasoner.Ordering('min-degree')
