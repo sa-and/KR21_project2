@@ -2,6 +2,8 @@ from typing import Union
 from BayesNet import BayesNet
 import pandas as pd
 import networkx as nx
+import copy
+import numpy as np
 
 class BNReasoner:
     def __init__(self, net: Union[str, BayesNet]):
@@ -18,7 +20,6 @@ class BNReasoner:
 
     def pruneNetwork(self, evidence=dict()):
         cpts = self.bn.get_all_cpts()
-
         # remove edges
         for node in cpts.keys():
             for ev in [ev for ev in evidence if ev in cpts[node].keys() and ev != list(cpts[node].keys())[-2]]: # Make sure the evidence is in the node and that the node is not the evidence itself
@@ -32,7 +33,6 @@ class BNReasoner:
                     self.bn.del_var(node)
                 if len(self.bn.get_children(ev)) == 0 and len(self.bn.get_parents(ev)) == 0:
                     self.bn.del_var(ev)
-        self.bn.draw_structure()
 
     def reduceNet(self, evidence=dict()):
         cpts = self.bn.get_all_cpts()
@@ -40,7 +40,129 @@ class BNReasoner:
             if sum([1 if ev in cpts[node].keys() else 0 for ev in evidence]) >= 1:
                 newCPT = self.bn.reduce_factor(pd.Series(evidence),cpts[node])
                 newCPT = newCPT[newCPT.p != 0]
-                self.bn.update_cpt(node, newCPT)
+                self.bn.update_cpt(node, newCPT)          
+
+    def maxingOut(self, variable):
+        cpts = self.bn.get_all_cpts()
+        df = cpts[variable]
+        res = pd.DataFrame(columns=df.columns.drop([variable]))
+
+        for i in range(len(df['family-out'])):
+            if i % 2 == 0:
+                max = df.loc[i:i, ['p', variable]]
+            else:
+                if df.loc[i, 'p'] > max.iloc[0, 0]:
+                    max = df.loc[i:i, ['p', variable]]
+                maxres = df.drop([variable, 'p'], axis=1).loc[i:i, :]
+                maxres['p'] = max.iloc[0, 0]
+                maxres['ins. of ' + variable] = max.iloc[0, 1]
+                res = pd.concat([res, maxres], axis=0, sort=False, ignore_index=True)
+        return res
+
+    def factorMultiplication(self, factor1, factor2):
+        cpts = self.bn.get_all_cpts()
+        X = cpts[factor1]
+        Z = cpts[factor2]
+        union = list(set(X.columns).intersection(Z.columns))
+        union.remove('p')
+        cols = list(pd.concat([X, Z]).columns)
+        cols.remove('p')
+        res = pd.DataFrame(columns=cols + ['p'])
+        for x in range(len(X.iloc[:, 0])):
+            for z in range(len(Z.iloc[:, 0])):
+                if X.loc[x, union[0]] == Z.loc[z, union[0]]:
+                    mul = X.loc[x, 'p'] * Z.loc[z, 'p']
+                    df = pd.merge(X.loc[x:x, X.columns != 'p'], Z.loc[z:z, Z.columns != 'p'])
+                    df['p'] = mul
+                    res = pd.concat([res, df])
+        return res
+
+    def Ordering(self, heuristic):
+        if heuristic == 'min-degree':
+            degrees = dict(self.bn.get_interaction_graph().degree)
+            graph = copy.deepcopy(self.bn.get_interaction_graph().adj)
+            order = []
+            for i in range(len(degrees)):
+                e = min(degrees, key=degrees.get)
+                order += [e]
+                new_edges = []
+                for j in graph:
+                    if e in graph[j]:
+                        if j in degrees:
+                            degrees[j] -= 1
+                            new_edges += [j]
+                for ne in range(len(new_edges) - 1):
+                    for ae in range(ne + 1, len(new_edges)):
+                        if new_edges[ae] not in graph[new_edges[ne]]:
+                            print('adding', ne)
+                            degrees[ne] += 1
+                del degrees[e]
+                print(order)
+            return order
+        elif heuristic == 'min-fill':
+            graph = copy.deepcopy(self.bn.get_interaction_graph().adj)
+            nodes = list(self.bn.get_interaction_graph().nodes)
+            order = []
+            for i in range(len(nodes)):
+                minimal = np.inf
+                for n in nodes:
+                    n_edges = 0
+                    new_edges = []
+                    for g in graph:
+                        if n in graph[g]:
+                            new_edges += [g]
+                    for ne in range(len(new_edges) - 1):
+                        for ae in range(ne + 1, len(new_edges)):
+                            if new_edges[ae] not in graph[new_edges[ne]]:
+                                n_edges += 1
+                    if minimal > n_edges:
+                        minimal = n_edges
+                        add = n
+                order += [add]
+                nodes.remove(add)
+            return order
+        else:
+            print('wrong heuristic chosen, pick either min-degree or min-fill')
+
+    def variableElimination(self, evidence=dict()):
+        print(evidence)
+        cpts = self.bn.get_all_cpts()
+        instantiation = pd.Series(evidence)
+        self.bn.draw_structure()
+        print(cpts)
+
+        order = reasoner.Ordering('min-degree')
+        for i in order:
+            pass
+
+        ##hiervoor heb ik elemination order nodig
+
+        #order = elimenation_order()
+
+        #reduce_factor(instantiation,cpts)
+        
+    def marginalDistributions(self, evidence=dict()):
+        print(evidence)
+        cpts = self.bn.get_all_cpts()
+        instantiation = pd.Series(evidence)
+        self.bn.draw_structure()
+        print(cpts)
+
+    def map(self, evidence=dict()):
+        print(evidence)
+        cpts = self.bn.get_all_cpts()
+        instantiation = pd.Series(evidence)
+        self.bn.draw_structure()
+        print(cpts)
+        #compute P(Q,e) first with variable elimination, then maximize-out Q using extended variables
+
+    def mpe(self, evidence=dict()):
+        print(evidence)
+        cpts = self.bn.get_all_cpts()
+        instantiation = pd.Series(evidence)
+        self.bn.draw_structure()
+        print(cpts)
+        #mazimize out all variables which are not in Q and e
 
     def dSeperation(self, x=list(), y=list(), z=list()):
         structure = self.bn.structure
@@ -64,8 +186,13 @@ class BNReasoner:
         # possible_edges = [edge for edge in edges if sum([1 if e in x or e in y else 0 for e in edge]) >= 1]
         # for edge in possible_edges:
 
-        # print(possible_paths)           
+        # print(possible_paths) 
+
+
 
 reasoner = BNReasoner("./testing/dog_problem.BIFXML")
-reasoner.pruneNetwork(evidence={"family-out": False})
-# reasoner.dSeperation(["hear-bark"],["family-out"],["light-on"])
+#reasoner.pruneNetwork(evidence={"dog-out": True})
+#reasoner.variable_elimination(evidence={"dog-out": True})
+reasoner.Ordering('min-degree')
+
+
