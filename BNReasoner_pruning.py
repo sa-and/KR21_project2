@@ -75,7 +75,11 @@ class BNReasoner_:
         return False
      
     def loop_over_children(self,bn, y, parent):
+        '''Checks for if y is a descendant of parent'''
+
+        # print("parent: ", parent)
         children = BayesNet.get_children(bn, parent)
+        # print("children: ", children)
         if len(children) == 0:
             return True
         else:
@@ -83,7 +87,9 @@ class BNReasoner_:
                 if child == y:
                     return False
                 else:
-                    return self.loop_over_children(bn, y, child)    
+                    if not self.loop_over_children(bn, y, child):
+                        return False
+            return True    
 
     def independence(self, bn, X, Y, Z):
         '''
@@ -106,11 +112,15 @@ class BNReasoner_:
             for y in Y: 
                 for parent in BayesNet.get_all_variables(bn):
                     if y in BayesNet.get_children(bn, parent):
+                        print(parent)
                         if parent not in Z:
                             return False 
             for y in Y:
+                # print(y)
                 for x in X:
+                    # print(self.loop_over_children(bn, x, y))
                     if not self.loop_over_children(bn, x, y):
+                        # print(x, "is not a descendent of ", y)
                         return False
             return True
 
@@ -124,8 +134,8 @@ class BNReasoner_:
 
      
 Pruning = False
-check_d_separation = False
-Independence = True
+check_d_separation = False #True
+Independence = False #True
 
 if Pruning:
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
@@ -139,7 +149,7 @@ if Pruning:
 #determine whether X is d-seperated from Y by Z
 if check_d_separation:
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
-    Y = {"Winter?"}
+    Y = {"Slippery Road?"}
     X = {"Wet Grass?"}
     Z = {"Rain?"} 
     if bnreasoner.d_separation(bnreasoner.bn, X,Y,Z):
@@ -153,8 +163,8 @@ if Independence:
     #zijn denk ik geimplementeerd.
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
     Y = {"Winter?"}
-    X = {"Wet Grass?"}
-    Z = {"Rain?"} 
+    X = {"Slippery Road?"}
+    Z = {} 
     if bnreasoner.independence(bnreasoner.bn, X,Y,Z):
         print(X, "is independent from ", Y, "given ", Z)
     else:
