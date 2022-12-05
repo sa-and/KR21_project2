@@ -164,32 +164,24 @@ class BNReasoner:
         print(cpts)
         #mazimize out all variables which are not in Q and e
 
-    def dSeperation(self, x=list(), y=list(), z=list()):
-        structure = self.bn.structure
-        edges = structure.edges
-        nodes = structure.nodes
-        filter_ = "bowel-problem"
-        print([node+":"+str(len(self.bn.get_children(node))+len(self.bn.get_parents(node))) for node in self.bn.structure.nodes])
-        print(edges)
-        # print(self.bn.get_parents(x[0]))
-        # for node in x:
-        #     pass
-            # print(list(self.bn.get_parent(node)))
+    def dSeperation(self, X=list(), Y=list(), Z=list()):
+        graph = self.bn.get_interaction_graph()
+        [graph.remove_node(z) for z in Z]
+        try:
+            return (False if len(list(nx.all_simple_paths(graph,source=X[0],target=Y[0]))) == 0 else True)
+        except:
+            return False
 
-        
-        # print(list(nx.all_simple_paths(self.bn.get_interaction_graph(),source=x[0],target=y[0])))
-        # print(edges,nodes)
-        # active_paths = False
-        # possible_edges = [edge for edge in edges if sum([1 if e in x or e in y else 0 for e in edge]) >= 1]
-        # for edge in possible_edges:
+    def independence(self, X=list(), Y=list(), Z=list()):
+        return not self.dSeperation(X,Y,Z)
 
-        # print(possible_paths) 
-
-
+    def marginalization():
+        pass
 
 reasoner = BNReasoner("./testing/dog_problem.BIFXML")
 #reasoner.pruneNetwork(evidence={"dog-out": True})
+print(reasoner.independence(["hear-bark"],["family-out"],["hear-bark"]))
 #reasoner.variable_elimination(evidence={"dog-out": True})
-reasoner.Ordering('min-degree')
+# reasoner.Ordering('min-degree')
 
 
