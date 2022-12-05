@@ -172,6 +172,37 @@ class BNReasoner_:
         # print(newcpt)
         return newcpt
 
+    def multiply_factors(self,f,g):
+        '''
+        Given two factors f and g, compute the multiplied factor h=fg
+        :param f: Factor f
+        :param g: Factor g
+        :returns: Multiplied factor h=f*g
+        '''
+
+
+        # check what the overlapping var(s) is
+        vars_f = [x for x in f.columns]
+        vars_g = [x for x in g.columns]
+
+        for var in vars_f:
+            if var in vars_g and var != 'p':
+                join_var = var
+
+        # merge two dataframes
+        merged = f.merge(g,left_on=join_var,right_on=join_var)
+
+        # multiply probabilities
+        merged['p'] = merged['p_x']*merged['p_y']
+
+        # drop individual probability columns
+        h = merged.drop(['p_x','p_y'],axis=1)
+
+        # return h
+        return h
+
+
+
 
 
 
@@ -182,7 +213,8 @@ Pruning = False
 check_d_separation = False #True
 Independence = False #True
 Marginalization = False
-MaxingOut = True
+MaxingOut = False # THIS NEEDS SOME WORK
+MultiplyFactor = True
 
 if Pruning:
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
@@ -221,6 +253,14 @@ if Marginalization:
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
     X = "Wet Grass?"
     bnreasoner.marginalization(bnreasoner.bn,X)
+
+if MultiplyFactor:
+    bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
+    X = 'Rain?'
+    Y = 'Wet Grass?'
+    cpt_1 = BayesNet.get_cpt(bnreasoner.bn,X)
+    cpt_2 = BayesNet.get_cpt(bnreasoner.bn,Y)
+    bnreasoner.multiply_factors(cpt_1,cpt_2) 
 
 
 
