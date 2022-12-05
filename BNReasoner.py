@@ -1,4 +1,5 @@
 from typing import Union, Dict, List
+from xmlrpc.client import Boolean
 from BayesNet import BayesNet
 from copy import deepcopy
 
@@ -18,9 +19,11 @@ class BNReasoner:
     # TODO: This is where your methods should go
     def pruning(self,query: List[str], values: Dict[str, bool]) -> BayesNet:
         """ Prune the network, will drop variables that are not needed anymore
+
         Args:
             query (List): Given query, used to check if nodes are part of it
             values (Dict): The given evedince to a node, must be True or False. Structure: {Node:Value}
+            
         Returns:
             p: BayesNet.object, returns the new pruned network
         """
@@ -47,4 +50,39 @@ class BNReasoner:
                     finished = True
         print(p.get_all_cpts()," dit is p")
         return p
+
+    def d_separation(self, x: List[str], y: List[str], z: List[str]) -> bool:
+        """ Check if variable x is d-seperated from y given z
+
+        Args:
+            x (List): List of variables to check
+            y (list): List of variables to check if x is seperated from
+            z (list): List of given variables
+            
+        Returns:
+            bool: True is d-seperated, False if not
+        """
+        p = deepcopy(self.bn)
+        reach_single = []
+        iterated = []
+        
+        for var in p.get_all_variables():
+            if p.get_children(var) == [] and var not in x and var not in y and var not in z:
+                p.del_var(var)
+        for var in z:
+            for child in p.get_children(var):
+                p.del_edge([var, child])
+        for var in x:
+            iterated.append(var) # Append variables to check
+            reach_single.extend(p.get_children(var)) # Append children
+            while list(set(reach_single) - set(iterated)) !=[]: # While loop makes sure children of children are checked
+                for a in list(set(reach_single) - set(iterated)): # Make sure all children are checked
+                    reach_single.extend(p.get_children(a)) # Append children of children if there are any
+                    iterated.append(a) # Append variable to prevent loop from checking again
+        for var_2 in y:
+            if var_2 in reach_single: # If y in x, not d-seperated
+                print(x, 'and', y, 'are not d-separated by', z)
+                return False
+        print(x, 'and', y, 'are d-separated by', z) # Else d-seperated
+        return True
 
