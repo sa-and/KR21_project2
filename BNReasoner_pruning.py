@@ -131,11 +131,58 @@ class BNReasoner_:
                      
         return True 
          
+    def marginalization(self,bn,X):
+        '''
+        Given a factor and a variable X, compute the CPT in which X is summed-out
+        :param bn: Bayesian Network
+        :param X: variable X
+        :returns: the CPT in which X is summed-out
+        '''
+
+        cpt = BayesNet.get_cpt(bn,X)
+        newcpt = cpt.drop([X],axis=1)
+        # print(newcpt)
+
+        remaining_vars = [x for x in newcpt.columns if x != X and x != 'p']
+        # print(remaining_vars)
+
+        newcpt = newcpt.groupby(remaining_vars).agg({'p': 'sum'})
+        newcpt.reset_index(inplace=True)
+        # print(newcpt)
+        return newcpt
+
+    def maxing_out(self,bn,X):
+        '''
+        NEEDS WORK
+        Given a factor and a variable X, compute the CPT in which X is maxed-out
+        :param bn: Bayesian Network
+        :param X: variable X
+        :returns: the CPT in which X is maxed-out
+        '''
+
+        cpt = BayesNet.get_cpt(bn,X)
+        newcpt = cpt.drop([X],axis=1)
+        # print(newcpt)
+
+        remaining_vars = [x for x in newcpt.columns if x != X and x != 'p']
+        # print(remaining_vars)
+
+        newcpt = newcpt.groupby(remaining_vars).agg({'p': 'max'})
+        newcpt.reset_index(inplace=True)
+        # print(newcpt)
+        return newcpt
+
+
+
+
+
 
      
 Pruning = False
 check_d_separation = False #True
 Independence = False #True
+Marginalization = False
+MaxingOut = True
 
 if Pruning:
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
@@ -170,7 +217,10 @@ if Independence:
     else:
         print(X, "is not independent from ", Y, "given ", Z)
 
-
+if Marginalization:
+    bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
+    X = "Wet Grass?"
+    bnreasoner.marginalization(bnreasoner.bn,X)
 
 
 
