@@ -85,4 +85,36 @@ class BNReasoner:
                 return False
         print(x, 'and', y, 'are d-separated by', z) # Else d-seperated
         return True
+    
+    def min_degree(self) -> List[str]:
+        """Sort the nodes by looking at the degree
+
+        Returns:
+            List of variables sorted from small to big (degree in the interaction graph to the ordering)
+        """
+        p = deepcopy(self.bn)
+        return [x[0] for x in sorted(p.get_interaction_graph().degree(), key = lambda x: x[1])] # Sort list and only return the variable name
+
+    def min_fill(self) -> List[str]:
+        """ Minimum fill ordering
+            
+        Returns:
+            List of variables sorted from small to big (whose deletion would add the fewest new interaction to the ordering)
+        """
+        p = deepcopy(self.bn)
+        i_graph = p.get_interaction_graph()
+        order_edges = []
+        for node in i_graph:
+            i = 0
+            neighbors = i_graph.neighbors(node)
+            for a in neighbors:
+                neigh_a = i_graph.neighbors(a)
+                for b in neighbors:
+                    if a == b: # Do nothing
+                        continue
+                    if b not in neigh_a: # Count if b is not in neigh_a
+                        i += 1
+            order_edges.append((node, i)) 
+        return [x[0] for x in sorted(order_edges, key=lambda x: x[1])] # Sort the list and return only the variable name
+
 
