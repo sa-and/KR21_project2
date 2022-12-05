@@ -171,9 +171,6 @@ class BNReasoner:
         filter_ = "bowel-problem"
         print([node+":"+str(len(self.bn.get_children(node))+len(self.bn.get_parents(node))) for node in self.bn.structure.nodes])
         print(edges)
-        for node in lst:
-            for cpt in self.bn.get_all_cpts():
-                self.bn.update_cpt(node, maxingout(node))
         # print(self.bn.get_parents(x[0]))
         # for node in x:
         #     pass
