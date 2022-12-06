@@ -422,4 +422,24 @@ class BNReasoner:
                 # sum() instead of float() here, since the compatible table can be empty at times, this works around it
 
         return new_factor.reset_index(drop=True)
+    
+    def elimination(self, data: pd.DataFrame, var: List[str]) -> pd.DataFrame:
+        """ Sum out a set of variables by using variable elimination
 
+        Args:
+            data (pd.Dataframe): Dataframe of where elimination should take place
+            var (List): Variable to be summed out
+            
+        Returns:
+            pd.Dataframe: Dataframe after elimination
+        """
+        print(data, "initial dataframe")
+        remaining = data.drop(columns=var) # Drop column thats need to be summed out
+        rem_list = list(remaining.columns.values)[:-1] # Get remaining dataframe
+        if len(rem_list) == 0: # If empty return empty frame
+            print("This was the only variable, thus no data could be returned")
+            return pd.DataFrame()
+        eliminated = remaining.groupby( # Else sum of matching values of variables
+            rem_list).aggregate({'p': 'sum'})
+        eliminated.reset_index(inplace=True)
+        return eliminated
