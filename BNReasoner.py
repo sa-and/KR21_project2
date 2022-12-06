@@ -181,6 +181,9 @@ class BNReasoner:
 reasoner = BNReasoner("./testing/dog_problem.BIFXML")
 #reasoner.pruneNetwork(evidence={"dog-out": True})
 print(reasoner.independence(["hear-bark"],["family-out"],["hear-bark"]))
+print(reasoner.bn.get_interaction_graph().adj)
+# reasoner.bn.draw_structure()
+print(list(nx.all_simple_paths(reasoner.bn.structure,"family-out","hear-bark")))
 #reasoner.variable_elimination(evidence={"dog-out": True})
 # reasoner.Ordering('min-degree')
 
