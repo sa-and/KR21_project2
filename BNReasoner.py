@@ -2,9 +2,11 @@ from typing import Union, Dict, List
 from xmlrpc.client import Boolean
 from BayesNet import BayesNet
 from copy import deepcopy
+
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional, Tuple, Union
+
 from itertools import product, combinations
 
 class BNReasoner:
@@ -345,5 +347,79 @@ class BNReasoner:
             # print(new_factor)
             S[var_pi] = new_factor
 
+
         res_factor = self.factor_multiplication(list(S.values())) if len(S) > 1 else S.popitem()[1]
         return res_factor
+
+    def maximise_out(self, factor: Union[str, pd.DataFrame], subset: Union[str, list]) -> pd.DataFrame:
+        """
+        :param factor:
+        :param subset:
+        :return:
+        """
+        if isinstance(factor, str):
+            factor = self.bn.get_cpt(factor)
+        if isinstance(subset, str):
+            subset = [subset]
+
+        # Copy the factor, drop the variable(s) to be maximized, the extensions and 'p' and drop all duplicates to get
+        # each possible instantiation.
+        ext = [c for c in factor.columns if c[:3] == 'ext']
+        instantiations = deepcopy(factor).drop(subset + ext + ['p'], axis=1).drop_duplicates()
+        res_factor = pd.DataFrame(columns=factor.columns)
+
+        if len(instantiations.columns) == 0:
+            try:
+                res_factor = res_factor.append(factor.iloc[factor['p'].idxmax()])
+            except IndexError:
+                print('w')
+        else:
+            for _, instantiation in instantiations.iterrows():
+                cpt = self.bn.get_compatible_instantiations_table(instantiation, factor)
+                res_factor = res_factor.append(factor.iloc[cpt['p'].idxmax()])
+
+        # For each maximized-out variable(s), rename them to ext(variable)
+        for v in subset:
+            x = res_factor.pop(v)
+            res_factor[f'ext({v})'] = x
+
+        return res_factor.reset_index(drop=True)
+
+    def init_factor(self, variables: List[str], value=0) -> pd.DataFrame:
+        """
+        Generate a default CPT.
+        :param variables:   Column names
+        :param value:       Which the default p-value should be
+        :return:            A CPT
+        """
+        print(variables)
+        truth_table = product([True, False], repeat=len(variables))
+        factor = pd.DataFrame(truth_table, columns=variables)
+        factor['p'] = value
+        return factor
+
+    def sum_out_factors(self, factor: Union[str, pd.DataFrame], subset: Union[str, list]) -> pd.DataFrame:
+        """
+        Sum out some variable(s) in subset from a factor.
+        :param factor:  factor over variables X
+        :param subset:  a subset of variables X
+        :return:        a factor corresponding to the factor with the subset summed out
+        """
+    
+        if isinstance(factor, str):
+            factor = self.bn.get_cpt(factor)
+        if isinstance(subset, str):
+            subset = [subset]
+
+        new_factor = factor.drop(subset + ['p'], axis=1).drop_duplicates()
+        new_factor['p'] = 0
+        subset_factor = self.init_factor(subset)
+
+        for i, y in new_factor.iterrows():
+            for _, z in subset_factor.iterrows():
+                new_factor.loc[i, 'p'] = new_factor.loc[i, 'p'] + self.bn.get_compatible_instantiations_table(
+                    y[:-1].append(z[:-1]), factor)['p'].sum()
+                # sum() instead of float() here, since the compatible table can be empty at times, this works around it
+
+        return new_factor.reset_index(drop=True)
+

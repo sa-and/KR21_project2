@@ -4,10 +4,14 @@ import pandas as pd
 
 if __name__ == "__main__":
     print("begin")
+
     net = 'testing/lecture_example2.BIFXML'
+
+    #net = 'testing/lecture_example.BIFXML'
+
     bn = BayesNet()
     bn.load_from_bifxml(net)
-    bn.draw_structure()
+    # bn.draw_structure()
     bnr = BNReasoner(bn)
 
     ### Test pruning
@@ -25,6 +29,7 @@ if __name__ == "__main__":
     # outcome_min_fill = bnr.min_fill()
     # print(outcome_min_fill)
 
+
     ### Factor Multiplication
     # net = 'testing/lecture_example.BIFXML'
     # outcome_factor = bnr.factor_multiplication(['Rain?', 'Wet Grass?'])
@@ -35,10 +40,20 @@ if __name__ == "__main__":
     # mpe = bnr.MPE(pd.Series({'J': True, 'O': False}))
     # print(mpe)
 
+
     ### MAP
     map = bnr.MAP(['I', 'J'], pd.Series({'O': True}))
     print(map)
 
 
+
     # outcome.draw_structure()
+
+    X = "Wet Grass?"
+    Y = BayesNet.get_cpt(bnr.bn,X)
+    # f = bnr.multip_factors(Y)
+    print(Y)
+    outcome = bnr.sum_out_factors(Y,X) #bnr.maximise_out(Y,X)
+    print(outcome)
+
     #python3 test.py
