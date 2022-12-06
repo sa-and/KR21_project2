@@ -46,8 +46,9 @@ class BNReasoner:
         cpts = self.bn.get_all_cpts()
         df = cpts[variable]
         res = pd.DataFrame(columns=df.columns.drop([variable]))
+        print(res)
 
-        for i in range(len(df['family-out'])):
+        for i in range(len(df.iloc[:,0])):
             if i % 2 == 0:
                 max = df.loc[i:i, ['p', variable]]
             else:
@@ -57,6 +58,7 @@ class BNReasoner:
                 maxres['p'] = max.iloc[0, 0]
                 maxres['ins. of ' + variable] = max.iloc[0, 1]
                 res = pd.concat([res, maxres], axis=0, sort=False, ignore_index=True)
+        print(res)
         return res
 
     def factorMultiplication(self, factor1, factor2):
@@ -124,7 +126,7 @@ class BNReasoner:
         else:
             print('wrong heuristic chosen, pick either min-degree or min-fill')
 
-    def variableElimination(self, evidence=dict()):
+    def variableElimination(self, query, evidence=dict()):
         print(evidence)
         cpts = self.bn.get_all_cpts()
         instantiation = pd.Series(evidence)
@@ -133,7 +135,10 @@ class BNReasoner:
 
         order = reasoner.Ordering('min-degree')
         for i in order:
-            pass
+            if i not in query:
+                if i not in evidence:
+                    result = marginalization(cpts, factor, i)
+        return result
 
         ##hiervoor heb ik elemination order nodig
 
@@ -141,22 +146,36 @@ class BNReasoner:
 
         #reduce_factor(instantiation,cpts)
         
-    def marginalDistributions(self, evidence=dict()):
+    def marginalDistributions(self, query, evidence=dict()):
         print(evidence)
         cpts = self.bn.get_all_cpts()
         instantiation = pd.Series(evidence)
         self.bn.draw_structure()
         print(cpts)
 
-    def map(self, evidence=dict()):
+        #reduced_factors = self.bn.reduce_factor(instantiation, cpts)
+        #result = self.bn.get_all_cpts(reduced_factors)
+        #print(result)
+
+
+
+
+    def map(self, query=dict(), evidence=dict()):
         print(evidence)
         cpts = self.bn.get_all_cpts()
         instantiation = pd.Series(evidence)
         self.bn.draw_structure()
         print(cpts)
+
+        for i in all_variables:
+            if i not in query.keys():
+                marginalization(cpts, factor, i)
+
+            
+
         #compute P(Q,e) first with variable elimination, then maximize-out Q using extended variables
 
-    def mpe(self, evidence=dict()):
+    def mpe(self, query, evidence=dict()):
         print(evidence)
         cpts = self.bn.get_all_cpts()
         instantiation = pd.Series(evidence)
@@ -184,7 +203,12 @@ print(reasoner.independence(["hear-bark"],["family-out"],["hear-bark"]))
 print(reasoner.bn.get_interaction_graph().adj)
 # reasoner.bn.draw_structure()
 print(list(nx.all_simple_paths(reasoner.bn.structure,"family-out","hear-bark")))
+reasoner.pruneNetwork(evidence={"dog-out": True})
 #reasoner.variable_elimination(evidence={"dog-out": True})
 # reasoner.Ordering('min-degree')
 
+#reasoner.Ordering('min-degree')
+#reasoner.marginalDistributions(query = "hear-bark", evidence={"dog-out": True})
+#reasoner.map(evidence={"dog-out": True})
+#reasoner.maxingOut(variable="family-out")
 
