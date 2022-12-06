@@ -55,5 +55,10 @@ if __name__ == "__main__":
     print(Y)
     outcome = bnr.sum_out_factors(Y,X) #bnr.maximise_out(Y,X)
     print(outcome)
+    
+    ### Elimination
+    outcome_elim = bnr.elimination(bn.get_cpt('Wet Grass?'), ['Rain?'])
+    #outcome_elim = bnr.elimination(bn.get_cpt('Winter?'), ['Winter?']) # Empty Dataframe
+    print(outcome_elim)
 
     #python3 test.py
