@@ -2,7 +2,11 @@ from typing import Union, Dict, List
 from xmlrpc.client import Boolean
 from BayesNet import BayesNet
 from copy import deepcopy
+
+import numpy as np
 import pandas as pd
+from typing import Dict, List, Optional, Tuple, Union
+
 from itertools import product, combinations
 
 class BNReasoner:
@@ -50,7 +54,7 @@ class BNReasoner:
                 for child in p.get_children(a): # Check if the removed node has children, if yes delete edge
                     p.del_edge((a, child)) # Delete edge if input variable has child
                     finished = True
-        print(p.get_all_cpts()," dit is p")
+        # print(p.get_all_cpts()," dit is p")
         return p
 
     def d_separation(self, x: List[str], y: List[str], z: List[str]) -> bool:
@@ -87,6 +91,15 @@ class BNReasoner:
                 return False
         print(x, 'and', y, 'are d-separated by', z) # Else d-seperated
         return True
+
+    def random_order(self, network: BayesNet = None) -> List[str]:
+        """
+        :return: a random ordering of all variables in self.bn
+        """
+        if network is None:
+            return list(np.random.permutation(self.bn.get_all_variables()))
+        else:
+            return list(np.random.permutation(network.get_all_variables()))
     
     def min_degree(self) -> List[str]:
         """Sort the nodes by looking at the degree
@@ -119,6 +132,224 @@ class BNReasoner:
             order_edges.append((node, i)) 
         return [x[0] for x in sorted(order_edges, key=lambda x: x[1])] # Sort the list and return only the variable name
 
+    def init_factor(self,variables: List[str], value=0) -> pd.DataFrame:
+        """
+        Generate a default CPT.
+        :param variables:   Column names
+        :param value:       Which the default p-value should be
+        :return:            A CPT
+        """
+        truth_table = product([True, False], repeat=len(variables))
+        factor = pd.DataFrame(truth_table, columns=variables)
+        factor['p'] = value
+        return factor
+
+    def sum_out_factors(self, factor: Union[str, pd.DataFrame], subset: Union[str, list]) -> pd.DataFrame:
+        """
+        Sum out some variable(s) in subset from a factor.
+        :param factor:  factor over variables X
+        :param subset:  a subset of variables X
+        :return:        a factor corresponding to the factor with the subset summed out
+        """
+        if isinstance(factor, str):
+            factor = self.bn.get_cpt(factor)
+        if isinstance(subset, str):
+            subset = [subset]
+
+        new_factor = factor.drop(subset + ['p'], axis=1).drop_duplicates()
+        new_factor['p'] = 0
+        subset_factor = self.init_factor(subset)
+
+        for i, y in new_factor.iterrows():
+            for _, z in subset_factor.iterrows():
+                new_factor.loc[i, 'p'] = new_factor.loc[i, 'p'] + self.bn.get_compatible_instantiations_table(
+                    y[:-1].append(z[:-1]), factor)['p'].sum()
+                # sum() instead of float() here, since the compatible table can be empty at times, this works around it
+
+        return new_factor.reset_index(drop=True)
+
+    def maximise_out(self, factor: Union[str, pd.DataFrame], subset: Union[str, list]) -> pd.DataFrame:
+        """
+        :param factor:
+        :param subset:
+        :return:
+        """
+        if isinstance(factor, str):
+            factor = self.bn.get_cpt(factor)
+        if isinstance(subset, str):
+            subset = [subset]
+
+        # Copy the factor, drop the variable(s) to be maximized, the extensions and 'p' and drop all duplicates to get
+        # each possible instantiation.
+        ext = [c for c in factor.columns if c[:3] == 'ext']
+        instantiations = deepcopy(factor).drop(subset + ext + ['p'], axis=1).drop_duplicates()
+        res_factor = pd.DataFrame(columns=factor.columns)
+
+        if len(instantiations.columns) == 0:
+            try:
+                res_factor = res_factor.append(factor.iloc[factor['p'].idxmax()])
+            except IndexError:
+                print('w')
+        else:
+            for _, instantiation in instantiations.iterrows():
+                cpt = self.bn.get_compatible_instantiations_table(instantiation, factor)
+                res_factor = res_factor.append(factor.iloc[cpt['p'].idxmax()])
+
+        # For each maximized-out variable(s), rename them to ext(variable)
+        for v in subset:
+            x = res_factor.pop(v)
+            res_factor[f'ext({v})'] = x
+
+        return res_factor.reset_index(drop=True)
+
+    def factor_multiplication(self,f,g):
+        '''
+        Given two factors f and g, compute the multiplied factor h=fg
+        :param f: Factor f
+        :param g: Factor g
+        :returns: Multiplied factor h=f*g
+        '''
+
+        # check what the overlapping var(s) is
+        vars_f = [x for x in f.columns]
+        vars_g = [x for x in g.columns]
+
+        for var in vars_f:
+            if var in vars_g and var != 'p':
+                join_var = var
+
+        # merge two dataframes
+        merged = f.merge(g,left_on=join_var,right_on=join_var)
+
+        # multiply probabilities
+        merged['p'] = merged['p_x']*merged['p_y']
+
+        # drop individual probability columns
+        h = merged.drop(['p_x','p_y'],axis=1)
+
+        # return h
+        return h
+
+    def factor_multiplication(self, factors: List[Union[str, pd.DataFrame]]) -> pd.DataFrame:
+        """
+        Multiply multiple factors with each other.
+        :param factors: a list of factors
+        :return:        a factor corresponding to the product of all given factors
+        """
+        # If there are strings in the input-list of factors, replace them with the corresponding cpt
+        for x, y in enumerate(factors):
+            if isinstance(y, str):
+                factors[x] = self.bn.get_cpt(y)
+
+        new_factor = factors[0].drop('p', axis=1)
+        for i, factor in enumerate(factors[1:]):
+            try:
+                new_factor = new_factor.merge(factor.drop('p', axis=1), how='outer')
+            except pd.errors.MergeError:
+                new_factor = new_factor.join(factor.drop('p', axis=1), how='outer')
+        new_factor['p'] = 1
+
+        for i, z in new_factor.iterrows():
+            for _, f in enumerate(factors):
+                new_factor.loc[i, 'p'] = new_factor.loc[i, 'p'] * self.bn.get_compatible_instantiations_table(
+                    z[:-1], f)['p'].sum()
+                # sum() instead of float() here, since the compatible table can be empty at times, this works around it
+
+        # Reordering new_factor, putting the extensions to the back
+        cols = new_factor.columns
+        ext = [c for c in cols if c[:3] == 'ext']
+        if len(ext) > 0:
+            rest = list(np.setdiff1d(cols, ext))
+            new_factor = new_factor[rest + ext]
+
+        return new_factor.reset_index(drop=True)
+
+
+    def MPE(self, evidence: pd.Series, order_func: str = None) -> pd.DataFrame:
+        """
+        Compute the MPE instantiation for some given evidence.
+        :param evidence:
+        :param order_func:  String describing which order function to use
+        :return:            Dataframe describing the MPE instantiation
+        """
+        N = deepcopy(self.bn)
+        # Prune Edges
+        for var in evidence.keys():
+            for child in N.get_children(var):
+                N.del_edge((var, child))
+
+                new = N.get_compatible_instantiations_table(evidence, N.get_cpt(child)).reset_index(drop=True)
+                new = new.drop([var], axis=1)
+                N.update_cpt(child, new)
+            u = N.get_compatible_instantiations_table(evidence, N.get_cpt(var)).reset_index(drop=True)
+            N.update_cpt(var, u)
+
+        if order_func is None or order_func == "random":
+            order = self.random_order(N)
+        elif order_func == "min_degree":
+            order = self.min_degree(N)
+        elif order_func == "min_fill":
+            order = self.min_fill(N)
+        else:
+            raise Exception("Wrong order argument")
+
+        S = N.get_all_cpts()
+        for var_pi in order:
+            # Pop all functions from S, which mention var_pi...
+            func_k = [S.pop(key) for key, cpt in deepcopy(S).items() if var_pi in cpt]
+
+            new_factor = self.multiply_factors(func_k) if len(func_k) > 1 else func_k[0]
+            new_factor = self.maximise_out(new_factor, var_pi)
+
+            # And replace them with the new factor
+            S[var_pi] = new_factor
+
+        res_factor = self.multiply_factors(list(S.values())) if len(S) > 1 else S.popitem()[1]
+        return res_factor
+
+    def MAP(self, M: List[str], evidence: pd.Series, order_func: str = None) -> pd.DataFrame:
+        """
+        Compute the MAP instantiation for some variables and some given evidence.
+        :param M:           The MAP variables
+        :param evidence:
+        :param order_func:  String describing which order function to use
+        :return:            Dataframe describing the MAP instantiation
+        """
+        if len(np.intersect1d(list(evidence.keys()), M)) > 0:
+            raise Exception("Evidence cannot intersect with M")
+
+        N = deepcopy(self.bn)
+        N = self.pruning(M, evidence)
+        for e in evidence.items():
+            N.update_cpt(e[0], self.bn.get_compatible_instantiations_table(evidence,
+                                                                           N.get_cpt(e[0])).reset_index(drop=True))
+
+        if order_func is None or order_func == "random":
+            order = self.random_order(N)
+        elif order_func == "min_degree":
+            order = self.min_degree(N)
+        elif order_func == "min_fill":
+            order = self.min_fill(N)
+        else:
+            raise Exception("Wrong order argument")
+
+        S = N.get_all_cpts()
+        for var_pi in order:
+            # Pop all functions from S, which mention var_pi...
+            func_k = [S.pop(key) for key, cpt in deepcopy(S).items() if var_pi in cpt]
+
+            new_factor = self.factor_multiplication(func_k) if len(func_k) > 1 else func_k[0]
+            if var_pi in M:
+                new_factor = self.maximise_out(new_factor, var_pi)
+            else:
+                new_factor = self.sum_out_factors(new_factor, var_pi)
+            # And replace them with the new factor
+            # print(new_factor)
+            S[var_pi] = new_factor
+
+
+        res_factor = self.factor_multiplication(list(S.values())) if len(S) > 1 else S.popitem()[1]
+        return res_factor
 
     def maximise_out(self, factor: Union[str, pd.DataFrame], subset: Union[str, list]) -> pd.DataFrame:
         """
@@ -191,3 +422,4 @@ class BNReasoner:
                 # sum() instead of float() here, since the compatible table can be empty at times, this works around it
 
         return new_factor.reset_index(drop=True)
+
