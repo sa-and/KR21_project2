@@ -52,15 +52,17 @@ class TestDSeparation:
 class TestMarginalisation:
 
     def test_case1(self, bn2):
-        bayes = BayesNet("./testing/lecture_example.BIFXML")
+        bayes = BayesNet()
+        bayes.load_from_bifxml("./testing/lecture_example.BIFXML")
+
         all_ctp = bayes.get_all_cpts()
         test_cpt = all_ctp["Sprinkler?"]
         X = 'Winter?'
     
         outcome = bn2.marginalization(X, test_cpt)
         expected_outcome = pd.DataFrame({"Sprinkler?": [False, True], "p": [1.05, 0.95]})
-
-        assert not outcome == expected_outcome
+   
+        assert outcome.equals(expected_outcome)
         
 class TestMaxingOut:
     
@@ -81,15 +83,16 @@ class TestMaxingOut:
 class TestFactorMultiplication:
 
     def testcase1(self, bn2):
-        bayes = BayesNet("./testing/lecture_example.BIFXML")
+        bayes = BayesNet()
+        bayes.load_from_bifxml("./testing/lecture_example.BIFXML")
         all_cpt = bayes.get_all_cpts()
         test_cpt1 = all_cpt["Winter?"]
-        test_cpt2 = all_cpt["Rain"]
+        test_cpt2 = all_cpt["Rain?"]
 
         multiplication = bn2.factor_multiplication(test_cpt1, test_cpt2)
         expected = pd.DataFrame({"Winter": [False, False, True, True], "Rain?": [False, True, False, True], "p": [0.36, 0.04, 0.12, 0.48]})
-
-        assert not multiplication == expected
+        
+        assert not multiplication.equals(expected)
 
 
 

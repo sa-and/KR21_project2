@@ -98,6 +98,17 @@ class BNReasoner:
         new_cpt.reset_index(inplace=True)
 
         return new_cpt
+    
+    
+    def print(self):
+
+        all_ctp = self.bn.get_all_cpts()
+        test_ctp = all_ctp["Wet Grass?"]
+        cpt, extended_factor = self.maxing_out("Rain?", test_ctp) 
+
+        #print(cpt)
+
+        #print(extended_factor)
 
     def maxing_out(self, X, cpt):
         """
@@ -108,14 +119,19 @@ class BNReasoner:
         new_cpt = cpt.groupby(variables_left).agg({"p": "max"})
         new_cpt.reset_index(inplace=True)
 
-        # Get instantiation of X where variable X is maxed-out
-        combined_cpt = pd.concat([cpt, new_cpt], axis=1)
-        reduced_cpt = combined_cpt.dropna(axis=0, how='any')
-        reduced_cpt[X] = reduced_cpt[X].map({True: f'{X} = True', False: f'{X} = No'}) 
-        reduced_cpt = reduced_cpt.iloc[:, :-2:]
-        reduced_cpt["p"] = reduced_cpt["p"].astype(str)
-        reduced_cpt['factor'] = reduced_cpt[["p", X]].agg(': '.join, axis=1)
-        extended_factor = reduced_cpt.drop([X, "p"], axis=1)
+        extended_factor = 0
+
+        
+        # # Get instantiation of X where variable X is maxed-out
+        # combined_cpt = pd.concat([cpt, new_cpt], axis=1)
+        # print(combined_cpt)
+        # reduced_cpt = combined_cpt.dropna(axis=0, how='any')
+        # reduced_cpt[X] = reduced_cpt[X].map({True: f'{X} = True', False: f'{X} = False'}) 
+        # reduced_cpt = reduced_cpt.iloc[:, :- (len(variables_left) + 1)]
+        # print(reduced_cpt)
+        # reduced_cpt["p"] = reduced_cpt["p"].astype(str)
+        # reduced_cpt['factor'] = reduced_cpt[["p", X]].agg(': '.join, axis=1)
+        # extended_factor = reduced_cpt.drop([X, "p"], axis=1)
         
         return new_cpt, extended_factor
 
@@ -275,5 +291,5 @@ class BNReasoner:
 
 if __name__ == "__main__":
     bayes = BNReasoner('testing/lecture_example.BIFXML')
-    bayes.min_degree_ordering({'I', 'J'})
+    bayes.print()
     
