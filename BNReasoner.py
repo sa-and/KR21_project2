@@ -73,21 +73,15 @@ class BNReasoner:
         """
         Given three sets of variables X, Y, and Z, determine whether X is independent of Y given Z
         """
+
         return self.is_dsep(X, Y, Z)
 
-    def compute_factor(self):
-        pass
-    
     def marginalization(self, X, cpt):
         """
         This function computes the CPT in which the variable X is summed-out 
         """
 
-        # Delete node X
-        new_cpt = cpt.drop([X], axis=1)
         variables_left = [variable for variable in new_cpt.columns if variable != X and variable != 'p']
-
-        # Make case if there is only one variable
 
         # Take the sum of the factors
         new_cpt = new_cpt.groupby(variables_left).agg({'p': 'sum'})
@@ -104,15 +98,15 @@ class BNReasoner:
         new_cpt = cpt.groupby(variables_left).agg({"p": "max"})
         new_cpt.reset_index(inplace=True)
 
-        # Keep track of instatiation of X that led to maximized value
-        # change this 
-        extended_factor = cpt.groupby(X).agg({"p": "max"})
-        extended_factor = extended_factor.drop(["p"], axis=1)
-        extended_factor.reset_index(inplace=True)
-
-        #self.extended_factor[] = cpt.groupby.agg({"p": "max"})
+        # Get instantiation of X where variable X is maxed-out
+        combined_cpt = pd.concat([cpt, new_cpt], axis=1)
+        reduced_cpt = combined_cpt.dropna(axis=0, how='any')
+        reduced_cpt[X] = reduced_cpt[X].map({True: f'{X} = True', False: f'{X} = No'}) 
+        reduced_cpt = reduced_cpt.iloc[:, :-2:]
+        reduced_cpt["p"] = reduced_cpt["p"].astype(str)
+        reduced_cpt['factor'] = reduced_cpt[["p", X]].agg(': '.join, axis=1)
+        extended_factor = reduced_cpt.drop([X, "p"], axis=1)
         
-
         return new_cpt, extended_factor
 
     def factor_multiplication(self, cpt1, cpt2):
@@ -135,4 +129,6 @@ class BNReasoner:
 
 if __name__ == "__main__":
     bayes = BNReasoner('testing/lecture_example.BIFXML')
+    print(bayes.print())
+
     
