@@ -76,7 +76,8 @@ class BNReasoner:
     def compute_factor(self):
         pass
     
-    def marginalization(self, X, cpt):
+    @staticmethod
+    def marginalization(X, cpt):
         """
         This function computes the CPT in which the variable X is summed-out 
         """
@@ -91,7 +92,8 @@ class BNReasoner:
 
         return new_cpt
 
-    def maxing_out(self, X, cpt):
+    @staticmethod
+    def maxing_out(X, cpt):
         """
         This function computes the CPT in which the variable X is maxed-out
         """
@@ -309,12 +311,12 @@ class BNReasoner:
                     else:
                         p_Q_e = self.factor_multiplication(p_Q_e, upd_cpts[child])
                         visited.append(child)
-        
+
         # get all the variables that are not in Q or e and sum-out them
         X = set(self.bn.get_all_variables()) - Q - set(e.keys())
         for var in X:
             p_Q_e = self.marginalization(var, p_Q_e)
-        
+
         # compute probability of e
         p_e = p_Q_e.copy()
         for var in Q:
