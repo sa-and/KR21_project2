@@ -126,7 +126,7 @@ class BNReasoner:
 
         cpt1_variables = list(cpt1.columns)
         cpt2_variables = list(cpt2.columns)
-        common_variables = [variable for variable in cpt1_variablee if variable in cpt2_variables and variable != 'p']
+        common_variables = [variable for variable in cpt1_variables if variable in cpt2_variables and variable != 'p']
 
         if not common_variables:
             return 'ERROR: no common variables in CPTs, no multiplication possible'
