@@ -23,6 +23,7 @@ class BNReasoner:
                         if len(self.bn.get_children(v)) == 0]
 
     def __disconnected(self, X: set[str], Y: set[str]) -> bool:
+        # TODO: Follow all children
         for x in X:
             if any(child in Y for child in self.bn.get_children(x)):
                 return False
@@ -40,6 +41,17 @@ class BNReasoner:
         del cpt[var]
         return cpt
 
+    def _get_default_ordering(self, deps):
+        return deps
+    
+    def get_ordered(self, deps):
+        """
+        This can call any number of heuristics-based implementations that
+        order the dependencies of a variable in a particular order. For now
+        it just returns the same ordering as given.
+        """
+        return self._get_default_ordering(deps)
+
     def _pr(self, x: str):
         """
         Computes probability of x Pr(x) in graph by marginalizing on 
@@ -50,11 +62,11 @@ class BNReasoner:
         if len(deps) == 0:
             return cpt[cpt[x] == True].p.values[0]
         cpt = cpt.copy()
+        deps = self.get_ordered(deps)
         for dep in deps:
             pr_dep = self._pr(dep)
             cpt = BNReasoner.__prune_variable(cpt, dep, pr_dep)
         return cpt[cpt[x] == True].p.values[0]
-
 
     def prune(self, Q: set[str], E: set[str]):
         """
@@ -62,12 +74,20 @@ class BNReasoner:
         Bayesian network s.t. queries of the form P(Q|E) can still be correctly 
         calculated. (3.5 pts)
         """
-        alls = list(Q.union(E))
-        for q in Q:
-            pass
+        ignore_vars = ['p', *(list(Q.union(E)))]
         breakpoint()
-        pass
+        for q in Q.union(E):
+            cpt = self.bn.get_cpt(q)
+            deps = [col for col in cpt.columns if col not in ignore_vars]
+            deps = self.get_ordered(deps)
+            for dep in deps:
+                pr = self._pr(dep)
+                cpt = self.__prune_variable(cpt, dep, pr)
+                self.bn.update_cpt(q, cpt)
+            self.bn.update_cpt(q, cpt)
         
+    def dsep2(self, X: set[str], Y: set[str], Z: set[str]) -> bool:
+        pass
 
     def dsep(self, X: set[str], Y: set[str], Z: set[str]) -> bool:
         """
@@ -94,8 +114,10 @@ class BNReasoner:
         Independence: Given three sets of variables X, Y, and Z, determine whether X
         is independent of Y given Z. (Hint: Remember the connection between d-separation 
         and independence) (1.5pts)
+
+        TODO: Upate that it also checks other independencies
         """
-        return self.desp(X, Y, Z)
+        return self.dsep(X, Y, Z)
 
     def marginalize(self, factor, x):
         """
@@ -115,6 +137,7 @@ def main():
     reasoner = BNReasoner('testing/lecture_example.BIFXML')
     print(reasoner._pr('Slippery Road?'))
     print(reasoner._pr('Rain?'))
+    reasoner.prune(set(['Slippery Road?']), set(['Rain?']))
     breakpoint()
 
 if __name__ == '__main__':
