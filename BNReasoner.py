@@ -1,4 +1,5 @@
 import pandas as pd
+from functools import partial
 from typing import List
 from typing import Union
 from BayesNet import BayesNet
@@ -133,11 +134,23 @@ class BNReasoner:
         pass
 
 
+def order_by_deps(reasoner, v1):
+    return len(reasoner.bn.get_cpt(v1).columns)
+
+
+def test_prune(reasoner):
+    vars = reasoner.bn.get_all_variables()
+    vars = sorted(vars, key=partial(order_by_deps, reasoner))
+    pre_prune = reasoner._pr(vars[4])
+    reasoner.prune(set(vars[:4]), set(vars[-1:]))
+    assert pre_prune == reasoner._pr(vars[4])
+
+
 def main():
     reasoner = BNReasoner('testing/lecture_example.BIFXML')
     print(reasoner._pr('Slippery Road?'))
     print(reasoner._pr('Rain?'))
-    reasoner.prune(set(['Slippery Road?']), set(['Rain?']))
+    # reasoner.prune(set(['Slippery Road?']), set(['Rain?']))
     breakpoint()
 
 if __name__ == '__main__':
