@@ -1,4 +1,5 @@
 from itertools import combinations, product
+import pandas as pd
 from typing import Union, List
 from BayesNet import BayesNet
 
@@ -184,7 +185,7 @@ class BNReasoner:
         order = []
         while len(amounts):
             node = amounts[0][0]
-            print(node)
+            # print(node)
 
             # connect neighbours with each other
             neighbours = list(graph.neighbors(node)) # get all the neighbours of the node, participating in order
@@ -209,7 +210,7 @@ class BNReasoner:
 
     def elimination_order(self, X, heuristic=None):
         if heuristic is None:
-            order = X
+            order = list(X)
         elif heuristic == 'min_deg':
             order = self.min_degree_ordering(X)
         elif heuristic == 'min_fill':
