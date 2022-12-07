@@ -86,8 +86,8 @@ class BNReasoner:
         variables_left = [variable for variable in new_cpt.columns if variable != X and variable != 'p']
 
         # Take the sum of the factors
-        new_cpt = new_cpt.groupby(variables_left).agg({'p': 'sum'})
-        cpt.reset_index(inplace=True)
+        new_cpt = pd.DataFrame(new_cpt.groupby(variables_left, as_index=False).agg({'p': 'sum'}))
+        new_cpt.reset_index(inplace=True)
 
         return new_cpt
 
