@@ -1,4 +1,6 @@
-from typing import Union
+from typing import Union, List
+import pandas as pd
+
 from BayesNet import BayesNet
 
 
@@ -15,30 +17,37 @@ class BNReasoner:
         else:
             self.bn = net
 
-    def prune(self, Q, e):
+    def prune(self, Q: List[str], e: pd.Series) -> None:
         """
         Given a set of query variables Q and evidence e, performs node and edge pruning on
         the BN such that queries of the form P(Q|e) can still be correctly calculated.
 
-        :param Q: List of query variables
-        :param e: List of query variables
+        :param Q: List of query variables. E.g.: ["X", "Y", "Z"]
+        :param e: Evidence as a series of assignments. E.g.: pd.Series({"A": True, "B": False})
         """
         # Edge pruning - remove outgoing edges of every node in evidence e
-        for node in e:
-            for edge in list(self.bn.out_edges(node)):
+        for e_node, e_value in e.items():
+            for edge in list(self.bn.out_edges(e_node)):
+                # Delete the edge
                 self.bn.del_edge(edge)
+
+                # Update the cpts of the nodes on the receiving side of the edge
+                recv_node = edge[1]
+                new_cpt = self.bn.reduce_factor(pd.Series({e_node: e_value}), self.bn.get_cpt(recv_node))
+                new_cpt = self.marginalization(e_node, new_cpt)
+                self.bn.update_cpt(recv_node, new_cpt)
         
         # Node pruning - iteratively delete any leaf nodes that do not appear in Q or e
         node_deleted = True
         while node_deleted:
             node_deleted = False
             for node in self.bn.get_all_variables():
-                if self.bn.is_leaf_node(node) and (node not in [*Q, *e]):
+                if self.bn.is_leaf_node(node) and (node not in [*Q, *list(e.keys())]):
                     self.bn.del_var(node)
                     node_deleted = True
                     break
     
-    def is_dsep(self, X, Y, Z):
+    def is_dsep(self, X: List[str], Y: List[str], Z: List[str]) -> bool:
         """
         Given three sets of variables X, Y, and Z, determine whether X is d-separated of Y given Z.
         """
@@ -65,7 +74,7 @@ class BNReasoner:
         
         return True
     
-    def is_independent(self, X, Y, Z):
+    def is_independent(self, X: List[str], Y: List[str], Z: List[str]) -> bool:
         """
         Given three sets of variables X, Y, and Z, determine whether X is independent of Y given Z
         """
