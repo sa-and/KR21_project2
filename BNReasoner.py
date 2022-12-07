@@ -81,11 +81,11 @@ class BNReasoner:
         This function computes the CPT in which the variable X is summed-out 
         """
 
-        variables_left = [variable for variable in new_cpt.columns if variable != X and variable != 'p']
+        variables_left = [variable for variable in cpt.columns if variable != X and variable != 'p']
 
         # Take the sum of the factors
-        new_cpt = new_cpt.groupby(variables_left).agg({'p': 'sum'})
-        cpt.reset_index(inplace=True)
+        new_cpt = cpt.groupby(variables_left).agg({'p': 'sum'})
+        new_cpt.reset_index(inplace=True)
 
         return new_cpt
 
@@ -129,6 +129,5 @@ class BNReasoner:
 
 if __name__ == "__main__":
     bayes = BNReasoner('testing/lecture_example.BIFXML')
-    print(bayes.print())
 
     
