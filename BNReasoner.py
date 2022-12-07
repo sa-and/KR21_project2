@@ -19,26 +19,64 @@ class BNReasoner:
         self.variables = self.bn.get_all_variables()
         self.extended_factor = {}
 
-    def print(self):
+    def prune(self, Q, e):
         """
-        for testing purpose
+        Given a set of query variables Q and evidence e, performs node and edge pruning on
+        the BN such that queries of the form P(Q|e) can still be correctly calculated.
+
+        :param Q: List of query variables
+        :param e: List of query variables
         """
-
-        all_ctps = self.bn.get_all_cpts()
+        # Edge pruning - remove outgoing edges of every node in evidence e
+        for node in e:
+            for edge in list(self.bn.out_edges(node)):
+                self.bn.del_edge(edge)
         
-        for ctp in all_ctps.keys():
-            test_cpt = all_ctps[ctp]
-        
-        #print(test_cpt)
-        new_cpt, extended_factor = self.maxing_out('Rain?', test_cpt)
-        print(new_cpt)
-
-        print(f'extended {extended_factor}')
-  
-
-           
+        # Node pruning - iteratively delete any leaf nodes that do not appear in Q or e
+        node_deleted = True
+        while node_deleted:
+            node_deleted = False
+            for node in self.bn.get_all_variables():
+                if self.bn.is_leaf_node(node) and (node not in [*Q, *e]):
+                    self.bn.del_var(node)
+                    node_deleted = True
+                    break
     
+    def is_dsep(self, X, Y, Z):
+        """
+        Given three sets of variables X, Y, and Z, determine whether X is d-separated of Y given Z.
+        """
+        # Delete all outgoing edges from nodes in Z
+        for node in Z:
+            for edge in list(self.bn.out_edges(node)):
+                self.bn.del_edge(edge)
+            
+        # Iteratively delete any leaf nodes that are not in X, Y or Z
+        node_deleted = True
+        while node_deleted:
+            node_deleted = False
+            for node in self.bn.get_all_variables():
+                if self.bn.is_leaf_node(node) and (node not in [*X, *Y, *Z]):
+                    self.bn.del_var(node)
+                    node_deleted = True
+                    break
         
+        # If X and Y are disconnected, then they are d-separated by Z
+        for x in X:
+            reachable_nodes = self.bn.all_reachable(x)
+            if any(node in Y for node in reachable_nodes):
+                return False
+        
+        return True
+    
+    def is_independent(self, X, Y, Z):
+        """
+        Given three sets of variables X, Y, and Z, determine whether X is independent of Y given Z
+        """
+        return self.is_dsep(X, Y, Z)
+
+    def compute_factor(self):
+        pass
     
     def marginalization(self, X, cpt):
         """
@@ -97,7 +135,4 @@ class BNReasoner:
 
 if __name__ == "__main__":
     bayes = BNReasoner('testing/lecture_example.BIFXML')
-    bayes.print()
-    
-
     
