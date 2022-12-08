@@ -194,18 +194,20 @@ class BNReasoner:
     def independence(self, X=list(), Y=list(), Z=list()):
         return not self.dSeperation(X,Y,Z)
 
-    def marginalization():
-        pass
+    def marginalization(self, X, cpt):
+        return cpt.groupby([value for value in list(cpt.columns) if value in self.bn.get_all_variables()])['p'].sum().reset_index()
 
 reasoner = BNReasoner("./testing/dog_problem.BIFXML")
 #reasoner.pruneNetwork(evidence={"dog-out": True})
 print(reasoner.independence(["hear-bark"],["family-out"],["hear-bark"]))
 print(reasoner.bn.get_interaction_graph().adj)
 # reasoner.bn.draw_structure()
-print(list(nx.all_simple_paths(reasoner.bn.structure,"family-out","hear-bark")))
-reasoner.pruneNetwork(evidence={"dog-out": True})
+# print(list(nx.all_simple_paths(reasoner.bn.structure,"family-out","hear-bark")))
+# reasoner.pruneNetwork(evidence={"dog-out": True})
 #reasoner.variable_elimination(evidence={"dog-out": True})
 # reasoner.Ordering('min-degree')
+
+print(reasoner.marginalization("family-out",reasoner.bn.get_all_cpts()["family-out"]))
 
 #reasoner.Ordering('min-degree')
 #reasoner.marginalDistributions(query = "hear-bark", evidence={"dog-out": True})
