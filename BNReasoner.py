@@ -3,7 +3,6 @@ from typing import Union, List, List
 import pandas as pd
 
 from BayesNet import BayesNet
-import pandas as pd
 
 
 class BNReasoner:
@@ -123,7 +122,6 @@ class BNReasoner:
         """
         This function computes the multiplied factor of two factors for two cpt's
         """
-
         cpt1_variables = list(cpt1.columns)
         cpt2_variables = list(cpt2.columns)
         common_variables = [variable for variable in cpt1_variables if variable in cpt2_variables and variable != 'p']
@@ -207,7 +205,7 @@ class BNReasoner:
         order = []
         while len(amounts):
             node = amounts[0][0]
-            print(node)
+            # print(node)
 
             # connect neighbours with each other
             neighbours = list(graph.neighbors(node)) # get all the neighbours of the node, participating in order
@@ -232,7 +230,7 @@ class BNReasoner:
 
     def elimination_order(self, X, heuristic=None):
         if heuristic is None:
-            order = X
+            order = list(X)
         elif heuristic == 'min_deg':
             order = self.min_degree_ordering(X)
         elif heuristic == 'min_fill':
@@ -256,24 +254,99 @@ class BNReasoner:
         return new_cpt
 
 
-    def marginal_distributions(self, Q, e=None):
+    def marginal_distribution(self, Q, e, heuristic='min_deg'):
         """
         Given query variables Q and possibly empty evidence e, compute the marginal distribution P(Q|e). 
         Note that Q is a subset of the variables 
         in the Bayesian network X with Q ⊂ X but can also be Q = X. 
         """
 
-        
-        
-        # reduce e
-        # compute probability Q and e - P(Q, e)
-        # compute probability of e
-        # compute P(Q, e)/P(e)
+        cpts = self.bn.get_all_cpts()
 
-        pass
+        # reduce all factors w.r.t. e
+        upd_cpts = {}
+        for var, cpt in cpts.items():
+            upd_cpt = self.bn.get_compatible_instantiations_table(e, cpt)
+            upd_cpts[var] = upd_cpt
+        # pprint(upd_cpts)
+
+        # get all the variables that are not in Q or e
+        X = set(self.bn.get_all_variables()) - Q - set(e.keys())
+
+        # get order of variables summation
+        order = self.elimination_order(X, heuristic=heuristic)
+
+        # get joint probability Q and e - P(Q, e)
+        p_Q_e = pd.DataFrame()
+        visited = []
+        for var in order:
+            for child in self.bn.get_children(var):
+                if child not in visited:
+                    if p_Q_e.size == 0:
+                        p_Q_e = self.factor_multiplication(upd_cpts[var], upd_cpts[child])
+                        visited.extend([var, child])
+                    else:
+                        p_Q_e = self.factor_multiplication(p_Q_e, upd_cpts[child])
+                        visited.append(child)
+
+            p_Q_e = self.marginalization(var, p_Q_e)
+
+        # compute probability of e
+        p_e = p_Q_e.copy()
+        for var in Q:
+            p_e = self.marginalization(var, p_e)
+        p_e = p_e['p'][0]
+
+        # divide joint probability on probability of evidence
+        p_Q_e['p'] = p_Q_e['p'].apply(lambda x: x/p_e['p'][0])
+
+        return p_Q_e
+
+    def marginal_distribution_brutto(self, Q, e):
+        """
+        Given query variables Q and possibly empty evidence e, compute the marginal distribution P(Q|e). 
+        Note that Q is a subset of the variables 
+        in the Bayesian network X with Q ⊂ X but can also be Q = X. 
+        """
+
+        cpts = self.bn.get_all_cpts()
+
+        # reduce all factors w.r.t. e
+        upd_cpts = {}
+        for var, cpt in cpts.items():
+            upd_cpt = self.bn.get_compatible_instantiations_table(e, cpt)
+            upd_cpts[var] = upd_cpt
+
+        # get joint probability Q and e - P(Q, e)
+        p_Q_e = pd.DataFrame()
+        visited = []
+        for var in self.bn.get_all_variables():
+            for child in self.bn.get_children(var):
+                if child not in visited:
+                    if p_Q_e.size == 0:
+                        p_Q_e = self.factor_multiplication(upd_cpts[var], upd_cpts[child])
+                        visited.extend([var, child])
+                    else:
+                        p_Q_e = self.factor_multiplication(p_Q_e, upd_cpts[child])
+                        visited.append(child)
+
+        # get all the variables that are not in Q or e and sum-out them
+        X = set(self.bn.get_all_variables()) - Q - set(e.keys())
+        for var in X:
+            p_Q_e = self.marginalization(var, p_Q_e)
+
+        # compute probability of e
+        p_e = p_Q_e.copy()
+        for var in Q:
+            p_e = bayes.marginalization(var, p_e)
+        p_e = p_e['p'][0]
+
+        # divide joint probability on probability of evidence
+        p_Q_e['p'] = p_Q_e['p'].apply(lambda x: x/p_e['p'][0])
+
+        return p_Q_e
 
 
 if __name__ == "__main__":
     bayes = BNReasoner('testing/lecture_example.BIFXML')
-    bayes.print()
     
