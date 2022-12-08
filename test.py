@@ -67,18 +67,17 @@ class TestMarginalisation:
 class TestMaxingOut:
     
     def testcase1(self, bn2):
-        bayes = BayesNet("./testing/lecture_example.BIFXML")
+        bayes = BayesNet()
+        bayes.load_from_bifxml("./testing/lecture_example.BIFXML")
         all_cpt = bayes.get_all_cpts()
-        test_cpt = all_cpt["Sprinkler?"]
-        X = 'Winter?'
-        print(test_cpt)
-    
-        cpt, extended_factor = bn2.maxing_out(X, test_cpt)
-        expected_cpt = pd.DataFrame({"Sprinkler?": [False, True], "p": [0.8, 0.75]})
-        expected_extended_factor = pd.DataFrame({"Sprinkler": [False, True], 'factor': ["Winter? = No", "Winter? = No"]})
+        test_cpt = all_cpt["Wet Grass?"]
+        X = 'Rain?'
+       
+        cpt = bn2.maxing_out(X, test_cpt)
+        expected_cpt = pd.DataFrame({"Sprinkler": [False, False, True, True], "Wetgrass": [False, True, False, True], "p": [1.00, 0.80, 0.10, 0.95],
+        f'extended factor {X}': [False, True, False, True]})
 
-        assert not cpt == expected_cpt
-        assert not extended_factor == expected_extended_factor
+        assert not cpt.equals(expected_cpt)
 
 class TestFactorMultiplication:
 

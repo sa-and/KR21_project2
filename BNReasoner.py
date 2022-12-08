@@ -94,46 +94,30 @@ class BNReasoner:
         variables_left = [variable for variable in cpt.columns if variable != X and variable != 'p']
 
         # Take the sum of the factors
-        new_cpt = cpt.groupby(variables_left).agg({'p': 'sum'})
-        new_cpt.reset_index(inplace=True)
-
+        new_cpt  = pd.DataFrame(cpt.groupby(variables_left, as_index=False).agg({'p': 'sum'}))
+        
         return new_cpt
-    
-    
-    def print(self):
-
-        all_ctp = self.bn.get_all_cpts()
-        test_ctp = all_ctp["Wet Grass?"]
-        cpt, extended_factor = self.maxing_out("Rain?", test_ctp) 
-
-        #print(cpt)
-
-        #print(extended_factor)
-
+        
     def maxing_out(self, X, cpt):
         """
         This function computes the CPT in which the variable X is maxed-out
         """
 
+        # Compute the CPT with the maximum probabilty when X is maxed-out 
         variables_left = [variable for variable in cpt.columns if variable != X and variable != 'p']
-        new_cpt = cpt.groupby(variables_left).agg({"p": "max"})
+        new_cpt = pd.DataFrame(cpt.groupby(variables_left).agg({"p": "max"}))
         new_cpt.reset_index(inplace=True)
-
-        extended_factor = 0
-
         
-        # # Get instantiation of X where variable X is maxed-out
-        # combined_cpt = pd.concat([cpt, new_cpt], axis=1)
-        # print(combined_cpt)
-        # reduced_cpt = combined_cpt.dropna(axis=0, how='any')
-        # reduced_cpt[X] = reduced_cpt[X].map({True: f'{X} = True', False: f'{X} = False'}) 
-        # reduced_cpt = reduced_cpt.iloc[:, :- (len(variables_left) + 1)]
-        # print(reduced_cpt)
-        # reduced_cpt["p"] = reduced_cpt["p"].astype(str)
-        # reduced_cpt['factor'] = reduced_cpt[["p", X]].agg(': '.join, axis=1)
-        # extended_factor = reduced_cpt.drop([X, "p"], axis=1)
+        # Check if there are any previous factors in the table 
+        previous_factors = [column for column in cpt.columns.tolist() if "extended factor" in column]
+
+        # Compute the new CPT with the extended factor added
+        extended_factor = pd.merge(cpt, new_cpt, on=["p"], how="inner").rename(columns= {X: "extended factor " + X})[f'extended factor {X}']
         
-        return new_cpt, extended_factor
+        if previous_factors:
+            return new_cpt.assign(**dict(cpt[previous_factors]), **{f'extended factor {X}': extended_factor}) 
+        else:
+            return new_cpt.assign(**{f"extended factor {X}": extended_factor})
 
     def factor_multiplication(self, cpt1, cpt2):
         """
