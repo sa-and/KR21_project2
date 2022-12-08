@@ -133,7 +133,7 @@ class BNReasoner:
         cpt_combined['p'] = cpt_combined['p_1'] * cpt_combined['p_2']
         cpt_combined = cpt_combined.drop(['p_1','p_2'], axis=1)
 
-        return cpt_combined
+        return pd.DataFrame(cpt_combined)
 
     
     def min_degree_ordering(self, X):

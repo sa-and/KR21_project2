@@ -74,10 +74,10 @@ class TestMaxingOut:
         X = 'Rain?'
        
         cpt = bn2.maxing_out(X, test_cpt)
-        expected_cpt = pd.DataFrame({"Sprinkler": [False, False, True, True], "Wetgrass": [False, True, False, True], "p": [1.00, 0.80, 0.10, 0.95],
+        expected_cpt = pd.DataFrame({"Sprinkler?": [False, False, True, True], "Wet Grass?": [False, True, False, True], "p": [1.00, 0.80, 0.10, 0.95],
         f'extended factor {X}': [False, True, False, True]})
 
-        assert not cpt.equals(expected_cpt)
+        assert cpt.equals(expected_cpt)
 
 class TestFactorMultiplication:
 
@@ -89,9 +89,12 @@ class TestFactorMultiplication:
         test_cpt2 = all_cpt["Rain?"]
 
         multiplication = bn2.factor_multiplication(test_cpt1, test_cpt2)
-        expected = pd.DataFrame({"Winter": [False, False, True, True], "Rain?": [False, True, False, True], "p": [0.36, 0.04, 0.12, 0.48]})
+        expected = pd.DataFrame({"Winter?": [False, False, True, True], "Rain?": [False, True, False, True], "p": [0.36, 0.04, 0.12, 0.48]})
+
+        print(multiplication)
         
-        assert not multiplication.equals(expected)
+        print(expected)
+        assert multiplication.equals(expected)
 
 
 
