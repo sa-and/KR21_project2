@@ -134,6 +134,7 @@ if __name__ == "__main__":
         outcome_map = bnr.MAP(['I', 'J'], pd.Series({'O': True}))
         print(outcome_map)
 
+
     ### MPE
     if checkMEP:
         net = 'testing/lecture_example2.BIFXML'
@@ -144,5 +145,21 @@ if __name__ == "__main__":
         print(outcome_mpe)
 
     # print(outcome)
+
+
+    # outcome.draw_structure()
+
+    X = "Wet Grass?"
+    Y = BayesNet.get_cpt(bnr.bn,X)
+    # f = bnr.multip_factors(Y)
+    print(Y)
+    outcome = bnr.sum_out_factors(Y,X) #bnr.maximise_out(Y,X)
+    print(outcome)
+    
+    ### Elimination
+    outcome_elim = bnr.elimination(bn.get_cpt('Wet Grass?'), ['Rain?'])
+    #outcome_elim = bnr.elimination(bn.get_cpt('Winter?'), ['Winter?']) # Empty Dataframe
+    print(outcome_elim)
+
 
     #python3 test.py

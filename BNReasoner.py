@@ -365,6 +365,7 @@ class BNReasoner:
 
     def elimination(self, data: pd.DataFrame, var: List[str]) -> pd.DataFrame:
         """ Sum out a set of variables by using variable elimination
+
         Args:
             data (pd.Dataframe): Dataframe of where elimination should take place
             var (List): Variable to be summed out
@@ -382,6 +383,7 @@ class BNReasoner:
             rem_list).aggregate({'p': 'sum'})
         eliminated.reset_index(inplace=True)
         return eliminated
+
 
     def loop_over_children(self,bn, y, parent):
         '''Checks for if y is a descendant of parent'''
