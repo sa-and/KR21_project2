@@ -23,15 +23,31 @@ class BNReasoner:
         return [v for v in self.bn.get_all_variables() 
                         if len(self.bn.get_children(v)) == 0]
 
+    def __has_path(self, x: str, Y: set[str]) -> bool:
+        """
+        Determines whether there is a path from x to any element in Y.
+        Simple BFS
+        """
+        visited = [x]
+        while len(visited) > 0:
+            node = visited.pop(0)
+            children = self.bn.get_children(node)
+            if any(y in children for y in Y):
+                return True
+            visited.extend(children)
+        return False
+
     def __disconnected(self, X: set[str], Y: set[str]) -> bool:
-        # TODO: Follow all children
         for x in X:
-            if any(child in Y for child in self.bn.get_children(x)):
-                return False
+            if self.__has_path(x, Y):
+                return True
         for y in Y:
-            if any(child in X for child in self.bn.get_children(y)):
-                return False
-        return True
+            if self.__has_path(y, X):
+                return True
+        return False
+
+    def num_deps(self, x):
+        return len(self.bn.get_cpt(x).columns)-2
 
     @staticmethod
     def __prune_variable(cpt: pd.DataFrame, var, pr: float) -> pd.DataFrame:
@@ -133,17 +149,27 @@ class BNReasoner:
         """
         pass
 
+    def variable_elimination(self, X):
+        """
+        Variable Elimination: Sum out a set of variables by using variable elimination.
+        (5pts)
 
-def order_by_deps(reasoner, v1):
-    return len(reasoner.bn.get_cpt(v1).columns)
+        set X contains all the variables to eliminate via summing out
+        """
+
+        
 
 
-def test_prune(reasoner):
+def test_prune(reasoner: BNReasoner):
     vars = reasoner.bn.get_all_variables()
-    vars = sorted(vars, key=partial(order_by_deps, reasoner))
+    vars = sorted(vars, key=reasoner.num_deps)
     pre_prune = reasoner._pr(vars[4])
     reasoner.prune(set(vars[:4]), set(vars[-1:]))
     assert pre_prune == reasoner._pr(vars[4])
+
+
+# def test_dsep(reasoner):
+    
 
 
 def main():
