@@ -3,6 +3,7 @@ from functools import partial
 from typing import List
 from typing import Union
 from BayesNet import BayesNet
+import itertools
 
 
 class BNReasoner:
@@ -119,19 +120,66 @@ class BNReasoner:
         TODO: Upate that it also checks other independencies
         """
         return self.dsep(X, Y, Z)
+    
+    def _compute_new_cpt(self, factor, x, which):
+        """
+        Given a factor and a variable X, compute the CPT in which X is either summed-out or maxed-out. (3pts)
+        """
+        factor_table = self.bn.get_cpt(factor)
+
+        f = pd.DataFrame(columns = factor_table.columns)
+        f["p"]= []
+        del f[x]
+
+        l = [False, True]
+        instantiations = [list(i) for i in itertools.product(l, repeat = len(factor_table.columns) - 2)]
+
+        Y = factor_table.columns
+        count = 0
+
+        for inst in instantiations:
+            inst_dict = {}
+            inst_list = []
+            for j in range((len(factor_table.columns) - 2)):
+                inst_dict[Y[j]] = inst[j]
+                inst_list.append(inst[j])
+            inst_series = pd.Series(inst_dict)
+            comp_inst = self.bn.get_compatible_instantiations_table(inst_series, self.bn.get_cpt(factor))
+            if which == 'max':
+                new_p = comp_inst.p.max()  
+            elif which == 'sum':  
+                new_p = comp_inst.p.sum()
+            inst_list.append(new_p)
+            f.loc[count] = inst_list
+
+            count += 1 
+
+        print(f)
+
+        return(f)
 
     def marginalize(self, factor, x):
         """
         Given a factor and a variable X, compute the CPT in which X is summed-out. (3pts)
         """
-        pass
+        return self._compute_new_cpt(factor, x, 'sum')
+        
 
     def maxing_out(self, factor, x):
         """
         Given a factor and a variable X, compute the CPT in which X is maxed-out. Remember
         to also keep track of which instantiation of X led to the maximized value. (5pts)
+        
+        TODO: Keep track of which value of X this comes from
         """
-        pass
+        return self._compute_new_cpt(factor, x, 'max')
+
+    def factor_mult(self, factors):
+        """
+        Given two factors f and g, compute the multiplied factor h=fg. (5pts)
+        """
+
+    
 
 
 def order_by_deps(reasoner, v1):
@@ -148,10 +196,13 @@ def test_prune(reasoner):
 
 def main():
     reasoner = BNReasoner('testing/lecture_example.BIFXML')
-    print(reasoner._pr('Slippery Road?'))
-    print(reasoner._pr('Rain?'))
+    # breakpoint()
+    reasoner.maxing_out('Wet Grass?', 'Sprinkler?')
+    # reasoner.bn.draw_structure()
+    # print(reasoner._pr('Slippery Road?'))
+    # print(reasoner._pr('Rain?'))
     # reasoner.prune(set(['Slippery Road?']), set(['Rain?']))
-    breakpoint()
+    # breakpoint()
 
 if __name__ == '__main__':
     main()
