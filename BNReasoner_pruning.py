@@ -28,34 +28,35 @@ class BNReasoner_:
                 It is not obligated, therefor this function is usable for d-separation, without knowing the assignment of the Z
         :return: pruned network
         '''
-
+        new_bn = deepcopy(bn)
         children = dict()
 
         #Get edges between nodes by asking for children, which are saved in a list (children)
         for u in e:
-            children[u] = BayesNet.get_children(bn, u)
+            children[u] = BayesNet.get_children(new_bn, u)
         
         #Edge Pruning  
         #Remove edges between evidence and children
         #if evidence has an assignment: Replace the factors/cpt to the reduced factors/cpt 
         for key in children:
             for value in children[key]:
-                BayesNet.del_edge(bn,(key,value))
+                BayesNet.del_edge(new_bn,(key,value))
                 if not evidence.empty:
-                    BayesNet.update_cpt(bn, value, BayesNet.reduce_factor(evidence, BayesNet.get_cpt(bn, value)))
+                    BayesNet.update_cpt(new_bn, value, BayesNet.reduce_factor(evidence, BayesNet.get_cpt(new_bn, value)))
         
         #Node Pruning
         #Need to keep removing leafnodes untill all leafnodes that can be removed are removed
         i = 1
         while i > 0:
             i = 0
-            var = BayesNet.get_all_variables (bn)
+            var = BayesNet.get_all_variables (new_bn)
             for v in var:
-                child = BayesNet.get_children(bn, v)
+                child = BayesNet.get_children(new_bn, v)
                 #If node is a leafnode and not in the Q or e, remove from bn
                 if len(child) == 0 and v not in Q and v not in e:
-                    BayesNet.del_var(bn, v)                
+                    BayesNet.del_var(new_bn, v)                
                     i += 1    
+        return new_bn  #Niet zeker of dit nodig is
         
         
     def d_separation(self, bn, X, Y, Z):
@@ -132,7 +133,7 @@ class BNReasoner_:
                      
         return True 
 
-    def marginalization(self,bn,X):
+    def marginalization(self,cpt, X):#bn,X):
         '''
         Given a factor and a variable X, compute the CPT in which X is summed-out
         :param bn: Bayesian Network
@@ -140,7 +141,7 @@ class BNReasoner_:
         :returns: the CPT in which X is summed-out
         '''
 
-        cpt = BayesNet.get_cpt(bn,X)
+        #cpt = BayesNet.get_cpt(bn,X)
         newcpt = cpt.drop([X],axis=1)
         # print(newcpt)
 
@@ -178,8 +179,6 @@ class BNReasoner_:
         :param g: Factor g
         :returns: Multiplied factor h=f*g
         '''
-
-
         # check what the overlapping var(s) is
         vars_f = [x for x in f.columns]
         vars_g = [x for x in g.columns]
@@ -206,10 +205,10 @@ class BNReasoner_:
         :returns: a string containing an ordering based on minumum fill
         '''
         order = ""
-
+    
         #dictionary of all edges in the interaction graph
         _, edges = self.least_edges(bn)
-
+            
         #saves number of added edges for each variable when that node would be removed
         dict_added_edges = dict()
         for var in BayesNet.get_all_variables(bn):
@@ -219,7 +218,7 @@ class BNReasoner_:
         #picks the node with the least number of added edges
         var_to_del = sorted(dict_added_edges.items(), key=lambda item: item[1])[0][0]
         order += var_to_del
-        
+            
         # remove node and return new edges 
         edges, _ = self.connect_nodes(var_to_del, edges)
 
@@ -269,7 +268,7 @@ class BNReasoner_:
             # print(to_del_var)
             edges, _ = self.connect_nodes(to_del_var, edges)
         return order
-
+        
     def min_deg(self, variables, edges):
         '''
         :param variables: a list with all variables that are not yet in the ordering
@@ -290,7 +289,7 @@ class BNReasoner_:
         for var in All_var:
             dict_nr_edges[var] = 0
             dict_edges[var] = list()
-        
+
         for var in All_var:
             children = BayesNet.get_children(bn, var)
             dict_nr_edges[var] += len(children)
@@ -323,7 +322,48 @@ class BNReasoner_:
         edges.pop(var)
         return edges, edge_added
 
-
+    def variable_elimination(self, to_sum_out_vars):
+        i = True
+        j = False
+        f = deepcopy(BayesNet.get_all_cpts(self.bn))
+        # print(f)
+        # print("-------------------")
+        done = list()
+        print(to_sum_out_vars)
+        for s in to_sum_out_vars:
+            print(s)
+            for var in f:
+                if s in list(f[var].columns):
+                    print(list(f[var].columns))
+                    if i == True:
+                        print("if")
+                        t = f[var]
+                        # print(f[var])
+                        print("---if---")
+                        i = False
+                        #f.pop(var)
+                        done.append(var)
+                    elif j == True:
+                        print("elif")
+                        # print(t)
+                        # print(n)                       
+                        t = self.multiply_factors(n, t)
+                        j = False
+                    else:
+                        print("else")
+                        # print(var)
+                        # print(f[var])
+                        t = self.multiply_factors(t, f[var])
+                        # print(f[var])
+                        done.append(var)
+                        #f.pop(var)
+            n = self.marginalization(t,s)
+            j = True
+            # print(f)
+            for var in done:
+                f.pop(var)
+        print(n)
+        return n
 
 Pruning = False
 check_d_separation = False #True
@@ -331,7 +371,8 @@ Independence = False #True
 Marginalization = False
 MaxingOut = False
 MultiplyFactor = False
-Ordering = True
+Ordering = False
+Variable_Elimination = True
 
 if Pruning:
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
@@ -389,5 +430,7 @@ if Ordering:
     bnreasoner.minimum_degree_ordering(bnreasoner.bn)
     bnreasoner.minimum_fill_ordering(bnreasoner.bn)
 
-
-    
+if Variable_Elimination:
+    Set = {"Rain?", "Winter?", "Sprinkler?", "Wet Grass?"}#, "Winter"}
+    bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
+    bnreasoner.variable_elimination(Set)
