@@ -16,3 +16,7 @@ class BNReasoner:
             self.bn = net
 
     # TODO: This is where your methods should go
+
+a = BNReasoner('testing/lecture_example.bifxml').bn 
+# a = BNReasoner('testing/lecture_example2.bifxml').bn
+a.draw_structure()
