@@ -136,32 +136,33 @@ class BNReasoner_:
     def marginalization(self,cpt, X):#bn,X):
         '''
         Given a factor and a variable X, compute the CPT in which X is summed-out
-        :param bn: Bayesian Network
+        :param cpt: a factor
         :param X: variable X
         :returns: the CPT in which X is summed-out
         '''
 
         #cpt = BayesNet.get_cpt(bn,X)
+                
         newcpt = cpt.drop([X],axis=1)
-        # print(newcpt)
-
-        remaining_vars = [x for x in newcpt.columns if x != X and x != 'p']
-        # print(remaining_vars)
-
+        
+        remaining_vars = [x for x in newcpt.columns if x != X and x != 'p'] 
+          
         newcpt = newcpt.groupby(remaining_vars).agg({'p': 'sum'})
+        
         newcpt.reset_index(inplace=True)
-        # print(newcpt)
+        
         return newcpt
 
-    def maxing_out(self,bn,X):
+    def maxing_out(self,bn,X):#cpt,X):
         '''
         Given a factor and a variable X, compute the CPT in which X is maxed-out
-        :param bn: Bayesian Network
+        :param cpt: a factor
         :param X: variable X
         :returns: the CPT in which X is maxed-out
         '''
 
         cpt = BayesNet.get_cpt(bn,X)
+
         newcpt = cpt.drop([X],axis=1)
 
         remaining_vars = [x for x in newcpt.columns if x != X and x != 'p']
@@ -182,14 +183,15 @@ class BNReasoner_:
         # check what the overlapping var(s) is
         vars_f = [x for x in f.columns]
         vars_g = [x for x in g.columns]
+        join_var = list()
 
         for var in vars_f:
             if var in vars_g and var != 'p':
-                join_var = var
+                join_var.append(var)
 
         # merge two dataframes
-        merged = f.merge(g,left_on=join_var,right_on=join_var)
-
+        #merged = f.merge(g,left_on=join_var,right_on=join_var)
+        merged = pd.merge(f,g, how="outer", on=join_var)
         # multiply probabilities
         merged['p'] = merged['p_x']*merged['p_y']
 
@@ -199,40 +201,40 @@ class BNReasoner_:
         # return h
         return h
 
-    def minimum_fill_ordering(self, bn):
+    def minimum_fill_ordering(self, bn, set):
         '''
         :param bn: Bayesnet of which an ordering needs to be returned based on minimum fill
         :returns: a string containing an ordering based on minumum fill
         '''
-        order = ""
+        order = list()
     
         #dictionary of all edges in the interaction graph
-        _, edges = self.least_edges(bn)
+        _, edges = self.least_edges(bn, set)
             
         #saves number of added edges for each variable when that node would be removed
         dict_added_edges = dict()
-        for var in BayesNet.get_all_variables(bn):
+        for var in set:
             vars_edges = deepcopy(edges)
-            _, added_edges = self.connect_nodes(var, vars_edges)
+            _, added_edges = self.connect_nodes(var, vars_edges, set)
             dict_added_edges[var] = added_edges
         #picks the node with the least number of added edges
         var_to_del = sorted(dict_added_edges.items(), key=lambda item: item[1])[0][0]
-        order += var_to_del
+        order.append(var_to_del)
             
         # remove node and return new edges 
-        edges, _ = self.connect_nodes(var_to_del, edges)
+        edges, _ = self.connect_nodes(var_to_del, edges, set)
 
         #for all remaining nodes pick the one that adds the least number of edges, add this to the ordering and 
         # remove this from the node from the variables that still need to be added to the ordering, and 
         # add edges if necessary 
-        for i in range(len(BayesNet.get_all_variables(bn)) - 1):
+        for i in range(len(set) - 1):
             variables = list(edges.keys())
-            to_del_var = self.min_fill(variables, edges)
-            order += to_del_var
-            edges, _ = self.connect_nodes(to_del_var, edges)
+            to_del_var = self.min_fill(variables, edges, set)
+            order.append(to_del_var)
+            edges, _ = self.connect_nodes(to_del_var, edges, set)
         return order
 
-    def min_fill(self, variables, edges):
+    def min_fill(self, variables, edges, set):
         '''
         :param variables: a list with all variables that are not yet in the ordering
         :param edges: a dictionary containing all the edges of the variables not yet in the ordering/ 
@@ -240,33 +242,33 @@ class BNReasoner_:
         :returns: the variable which would, when removed add the least number of edges
         '''
         dict_fill = dict()
-        for var in variables:
+        for var in variables: 
             vars_edges = deepcopy(edges)
-            _, added_edges = self.connect_nodes(var, vars_edges)
+            _, added_edges = self.connect_nodes(var, vars_edges, set)
             dict_fill[var] = added_edges   
         return sorted(dict_fill.items(), key=lambda item: item[1])[0][0]        
         
-    def minimum_degree_ordering(self, bn):
+    def minimum_degree_ordering(self, bn, set):
         '''
         :param bn: Bayesian network for which an ordering needs to be returned based on minimum degree
         :returns: a string containing an ordering based on minumum fill
         '''
-        order = ""
+        order = list()
 
         #get the var that has the least edges and a dict containing for each variable the edges in the interaction graph
-        to_del_var, edges = self.least_edges(bn)
-        order += to_del_var
+        to_del_var, edges = self.least_edges(bn, set)
+        order.append(to_del_var)
 
         #remove var and add edges if necessary
-        edges, _ = self.connect_nodes(to_del_var, edges)
+        edges, _ = self.connect_nodes(to_del_var, edges, set)
         #while not all var are added to the ordering, pick var that has the least edges, 
         # add this to the ordering and remove the var form the to added variables, add edges where necessary
-        for i in range(len(BayesNet.get_all_variables(bn)) - 1):
+        for i in range(len(set)-1):#BayesNet.get_all_variables(bn)) - 1):
             variables = list(edges.keys())
             to_del_var = self.min_deg(variables, edges)
-            order += to_del_var
+            order.append(to_del_var)
             # print(to_del_var)
-            edges, _ = self.connect_nodes(to_del_var, edges)
+            edges, _ = self.connect_nodes(to_del_var, edges, set)
         return order
         
     def min_deg(self, variables, edges):
@@ -282,24 +284,28 @@ class BNReasoner_:
         # print(dict_degrees)      
         return sorted(dict_degrees.items(), key=lambda item: item[1])[0][0]
 
-    def least_edges(self, bn):
-        All_var  = BayesNet.get_all_variables(bn)
+    def least_edges(self, bn, set):
+        # All_var  = BayesNet.get_all_variables(bn)
         dict_nr_edges = dict()
         dict_edges = dict()
-        for var in All_var:
+        for var in set:
             dict_nr_edges[var] = 0
             dict_edges[var] = list()
 
-        for var in All_var:
+        for var in set:
             children = BayesNet.get_children(bn, var)
             dict_nr_edges[var] += len(children)
             for child in children:
-                dict_edges[var].append((var,child))                
-                dict_edges[child].append((child, var))
-                dict_nr_edges[child] += 1      
+                    dict_edges[var].append((var,child))  
+                    if child in set:              
+                        dict_edges[child].append((child, var))
+                        dict_nr_edges[child] += 1      
+        # print(dict_edges)
+        # print()
+        # print(dict_nr_edges)
         return sorted(dict_nr_edges.items(), key=lambda item: item[1])[0][0], dict_edges
 
-    def connect_nodes(self, var, edges):  
+    def connect_nodes(self, var, edges, set):  
         '''
         adds edges between nodes if necessary when var is removed and removes var
         and count the number of added edges
@@ -309,70 +315,81 @@ class BNReasoner_:
                   in the graph, including the edges added when var is removed
                 : an integer that count the number of edges that are added when var is removed
         '''
-        edge_added = 0            
+        edge_added = 0 
+                  
         for edge_1 in edges[var]:
-            edges[edge_1[1]].remove((edge_1[1], var))
-            for edge_2 in edges[var]:                              
+            if edge_1[1] in set:
+                edges[edge_1[1]].remove((edge_1[1], var))
+            for edge_2 in edges[var]: 
+                added = False                              
                 if edge_1 != edge_2: 
-                    if (edge_2[1], edge_1[1]) not in edges[edge_2[1]]:                        
-                        edges[edge_2[1]].append((edge_2[1],edge_1[1]))
-                        edge_added += 1                    
-                    if (edge_1[1], edge_2[1]) not in edges[edge_1[1]]:                        
-                        edges[edge_1[1]].append((edge_1[1],edge_2[1]))                             
+                    if edge_2[1] in set:
+                        if (edge_2[1], edge_1[1]) not in edges[edge_2[1]]:                        
+                            edges[edge_2[1]].append((edge_2[1],edge_1[1]))
+                            added = True
+                            edge_added += 1   
+                    if edge_1[1] in set:                 
+                        if (edge_1[1], edge_2[1]) not in edges[edge_1[1]]:                        
+                            edges[edge_1[1]].append((edge_1[1],edge_2[1]))  
+                            if added == False:
+                                edge_added += 1                     
         edges.pop(var)
         return edges, edge_added
 
-    def variable_elimination(self, to_sum_out_vars):
-        i = True
-        j = False
+    def variable_elimination(self, to_sum_out_vars, order):
+        '''
+        :param to_sum_out_vars: Set of variables that need to be summed out
+        :param order: a string containing the type of ordering --> misschien gewoon de ordering mee geven (dus al eerder berekenen)
+        :return: the factor with all var in the to_sum_out_vars summed out
+        '''
         f = deepcopy(BayesNet.get_all_cpts(self.bn))
-        # print(f)
-        # print("-------------------")
+        if order == "minimum_degree_ordering":
+            order = self.minimum_degree_ordering(self.bn, to_sum_out_vars)
+        else:
+            order = self.minimum_fill_ordering(self.bn, to_sum_out_vars)
+
+        # order = ["Winter?", "Wet Grass?", "Sprinkler?", "Rain?"]
+
         done = list()
-        print(to_sum_out_vars)
-        for s in to_sum_out_vars:
-            print(s)
-            for var in f:
-                if s in list(f[var].columns):
-                    print(list(f[var].columns))
-                    if i == True:
-                        print("if")
-                        t = f[var]
-                        # print(f[var])
-                        print("---if---")
-                        i = False
-                        #f.pop(var)
+        n = None
+        # print(to_sum_out_vars)
+        # print(order)
+        for s in order:
+            to_multiply = list()
+            for var in f:   
+                if var not in done:             
+                    if s in list(f[var].columns):                    
                         done.append(var)
-                    elif j == True:
-                        print("elif")
-                        # print(t)
-                        # print(n)                       
-                        t = self.multiply_factors(n, t)
-                        j = False
-                    else:
-                        print("else")
-                        # print(var)
-                        # print(f[var])
-                        t = self.multiply_factors(t, f[var])
-                        # print(f[var])
-                        done.append(var)
-                        #f.pop(var)
-            n = self.marginalization(t,s)
-            j = True
-            # print(f)
-            for var in done:
-                f.pop(var)
+                        to_multiply.append(f[var])
+
+            if n is None:
+                n = to_multiply[0]
+                if len(to_multiply) > 1:
+                    for factor in to_multiply[1:]:
+                        # print(n)
+                        n = self.multiply_factors(n, factor)
+                    # print(n)
+                    n = self.marginalization(n, s)
+                    
+            else:      
+                for factor in to_multiply:
+                    # print(n)
+                    n = self.multiply_factors(n, factor)
+                # print("1")
+                # print(n)
+                # print("2")
+                n = self.marginalization(n, s)
         print(n)
-        return n
+        return n               
 
 Pruning = False
 check_d_separation = False #True
 Independence = False #True
 Marginalization = False
 MaxingOut = False
-MultiplyFactor = False
-Ordering = False
-Variable_Elimination = True
+MultiplyFactor = False#True
+Ordering = False# True
+Variable_Elimination = False#True
 
 if Pruning:
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
@@ -410,27 +427,33 @@ if Independence:
 if Marginalization:
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
     X = "Wet Grass?"
-    bnreasoner.marginalization(bnreasoner.bn,X)
+    cpt = BayesNet.get_cpt(bnreasoner.bn,X)
+    print(bnreasoner.marginalization(cpt, X))
 
 if MaxingOut:
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
     X = "Wet Grass?"
-    bnreasoner.maxing_out(bnreasoner.bn,X)
+    cpt = BayesNet.get_cpt(bnreasoner.bn,X)
+    print(bnreasoner.maxing_out(cpt,X))
+   
 
 if MultiplyFactor:
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
-    X = 'Rain?'
-    Y = 'Wet Grass?'
-    cpt_1 = BayesNet.get_cpt(bnreasoner.bn,X)
+    X = 'Sprinkler?'
+    Y = 'Rain?'
+    cpt_1 = BayesNet.get_cpt(bnreasoner.bn, X)
     cpt_2 = BayesNet.get_cpt(bnreasoner.bn,Y)
-    bnreasoner.multiply_factors(cpt_1,cpt_2) 
+    print(bnreasoner.multiply_factors(cpt_1,cpt_2)) 
+    
+    
 
 if Ordering:
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
-    bnreasoner.minimum_degree_ordering(bnreasoner.bn)
-    bnreasoner.minimum_fill_ordering(bnreasoner.bn)
+    Set = {"Sprinkler?", "Rain?"}#BayesNet.get_all_variables(bnreasoner.bn)
+    print(bnreasoner.minimum_degree_ordering(bnreasoner.bn, Set))
+    print(bnreasoner.minimum_fill_ordering(bnreasoner.bn, Set))
 
 if Variable_Elimination:
     Set = {"Rain?", "Winter?", "Sprinkler?", "Wet Grass?"}#, "Winter"}
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
-    bnreasoner.variable_elimination(Set)
+    print(bnreasoner.variable_elimination(Set, "minimum_degree_ordering"))
