@@ -190,12 +190,48 @@ class BNReasoner:
         """
         return self._compute_new_cpt(factor, x, 'max')
 
-    def factor_mult(self, factors):
+    def factor_mult(self, factor_f, factor_g):
         """
         Given two factors f and g, compute the multiplied factor h=fg. (5pts)
         """
+        factor_table_f = self.bn.get_cpt(factor_f)
+        factor_table_g = self.bn.get_cpt(factor_g)
+        print(factor_table_f)
+        print(factor_table_g)
+        
+        X = pd.DataFrame(columns = factor_table_f.columns)
+        Y = pd.DataFrame(columns = factor_table_g.columns)
+        
+        Z = pd.merge(X,Y)
 
-    
+        l = [False, True]
+        instantiations = [list(i) for i in itertools.product(l, repeat = len(Z.columns) - 1)]
+
+        inst_df = pd.DataFrame(instantiations, columns= Z.columns[:-1])
+
+        Z = Z.merge(inst_df, how='right')
+        
+        
+        for i in range(len(inst_df)):
+            # for j in range(inst_df):
+            f = {}
+            g = {} 
+            for variable in inst_df.columns:
+                if variable in factor_table_f.columns:
+                    f[variable] = inst_df[variable][i]
+                if variable in factor_table_g.columns:
+                    g[variable] = inst_df[variable][i]
+            
+            f_series = pd.Series(f)
+            g_series = pd.Series(g)
+
+            comp_inst_f = self.bn.get_compatible_instantiations_table(f_series, self.bn.get_cpt(factor_f))
+            comp_inst_g = self.bn.get_compatible_instantiations_table(g_series, self.bn.get_cpt(factor_g))
+            value = comp_inst_f.p.values[0] * comp_inst_g.p.values[0]
+            
+            Z.at[i,'p'] = value 
+        print(Z)
+        return Z
 
     def variable_elimination(self, X):
         """
@@ -205,7 +241,41 @@ class BNReasoner:
         set X contains all the variables to eliminate via summing out
         """
 
+    def min_degree_ordering(self, X):
+        """Given a set of variables X in the Bayesian network, 
+        compute a good ordering for the elimination of X based on the min-degree heuristics (2pts) 
+        and the min-fill heuristics (3.5pts). (Hint: you get the interaction graph ”for free” 
+        from the BayesNet class.)"""
+        graph = self.bn.get_interaction_graph()
         
+
+        pass
+        
+    def lowest_degree(self, graph, X):
+        lowest_degree = 100
+        name = "test" 
+
+        for i in X:
+            value = graph.degree[i]
+            print(value)
+            if value < lowest_degree:
+                lowest_degree = value
+                name = i 
+        return name 
+
+
+    def marginal_distribution(self, Q, e):
+        """Given query variables Q and possibly empty evidence e, 
+        compute the marginal distribution P(Q|e). Note that Q is a subset of 
+        the variables in the Bayesian network X with Q ⊂ X but can also be Q = X. (2.5pts)"""
+
+        # calculation of joint marginal 
+        # joint marginal by chain rule
+        Z = Q.append(e)
+    
+        #sum out Q, to calculate Pr(e) 
+
+        #Compute p(Q|e) = joint marginal/pr(e)
 
 
 def test_prune(reasoner: BNReasoner):
@@ -223,12 +293,16 @@ def test_prune(reasoner: BNReasoner):
 def main():
     reasoner = BNReasoner('testing/lecture_example.BIFXML')
     # breakpoint()
-    reasoner.maxing_out('Wet Grass?', 'Sprinkler?')
+    #reasoner.maxing_out('Wet Grass?', 'Sprinkler?')
     # reasoner.bn.draw_structure()
     # print(reasoner._pr('Slippery Road?'))
     # print(reasoner._pr('Rain?'))
     # reasoner.prune(set(['Slippery Road?']), set(['Rain?']))
     # breakpoint()
+    #reasoner.factor_mult("Wet Grass?", "Sprinkler?")
+
+    reasoner.min_degree(["Wet Grass?", "Sprinkler?", "Slippery Road?", "Rain?", "Winter?"])
+
 
 if __name__ == '__main__':
     main()
