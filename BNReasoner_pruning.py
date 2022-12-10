@@ -336,24 +336,34 @@ class BNReasoner_:
         edges.pop(var)
         return edges, edge_added
 
-    def variable_elimination(self, to_sum_out_vars, order):
+    def variable_elimination(self, to_sum_out_vars, e = {}, order =None):#, f = None):
         '''
         :param to_sum_out_vars: Set of variables that need to be summed out
         :param order: a string containing the type of ordering --> misschien gewoon de ordering mee geven (dus al eerder berekenen)
         :return: the factor with all var in the to_sum_out_vars summed out
         '''
-        f = deepcopy(BayesNet.get_all_cpts(self.bn))
-        if order == "minimum_degree_ordering":
+        if order is None:
+            order = to_sum_out_vars
+        elif order == "minimum_degree_ordering":
             order = self.minimum_degree_ordering(self.bn, to_sum_out_vars)
         else:
             order = self.minimum_fill_ordering(self.bn, to_sum_out_vars)
 
+        # if f is None:
+        f = deepcopy(BayesNet.get_all_cpts(self.bn))        
+
         # order = ["Winter?", "Wet Grass?", "Sprinkler?", "Rain?"]
+        if len(e) != 0:
+            for var in f:
+                # print(var)
+                # print(BayesNet.reduce_factor(e, f[var]))
+                f[var] = BayesNet.reduce_factor(e, f[var])
+                # print(f[var])           
 
         done = list()
         n = None
-        # print(to_sum_out_vars)
-        # print(order)
+        #print(to_sum_out_vars)
+        #print(order)
         for s in order:
             to_multiply = list()
             for var in f:   
@@ -379,8 +389,36 @@ class BNReasoner_:
                 # print(n)
                 # print("2")
                 n = self.marginalization(n, s)
-        print(n)
-        return n               
+        # print(n)
+        # print("-----------")
+        return n    
+
+    def marginal_distribution(self, Q, e):  
+        to_sum_out = BayesNet.get_all_variables(self.bn)
+        for var in Q:
+            to_sum_out.remove(var)  
+        if len(e) == 0:           
+            return self.variable_elimination(to_sum_out)
+        else:
+            # print("Pr(Q^e)")
+            cpt = self.variable_elimination(to_sum_out, e)
+            # print("Pr(e)")
+            # print(cpt)
+            
+            Pr_e = cpt["p"].sum()
+            # print(Pr_e)
+            list_to_be = list()
+            list_p = list()
+            for ind in cpt.index:
+                list_to_be.append(cpt['p'][ind]/Pr_e)
+                list_p.append(cpt['p'][ind])
+            # print(list_to_be)
+            # print(list_p)           
+            
+            for i in range(len(list_to_be)):
+                cpt['p'] = cpt['p'].replace(to_replace=list_p[i], value=list_to_be[i])
+            # print(cpt)
+            return cpt
 
 Pruning = False
 check_d_separation = False #True
@@ -390,6 +428,7 @@ MaxingOut = False
 MultiplyFactor = False#True
 Ordering = False# True
 Variable_Elimination = False#True
+Marginal_distribution = True
 
 if Pruning:
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
@@ -445,8 +484,6 @@ if MultiplyFactor:
     cpt_2 = BayesNet.get_cpt(bnreasoner.bn,Y)
     print(bnreasoner.multiply_factors(cpt_1,cpt_2)) 
     
-    
-
 if Ordering:
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
     Set = {"Sprinkler?", "Rain?"}#BayesNet.get_all_variables(bnreasoner.bn)
@@ -456,4 +493,15 @@ if Ordering:
 if Variable_Elimination:
     Set = {"Rain?", "Winter?", "Sprinkler?", "Wet Grass?"}#, "Winter"}
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
-    print(bnreasoner.variable_elimination(Set, "minimum_degree_ordering"))
+    print(bnreasoner.variable_elimination(to_sum_out_vars=Set, order = "minimum_degree_ordering"))
+
+if Marginal_distribution == True:
+    bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
+    Q = {"Slippery Road?", "Wet Grass?"}
+    evidence = {"Rain?": True, "Sprinkler?": False}
+    ev = set()
+    for k in evidence:
+        ev.add(k)
+    e = pd.Series(data= evidence, index = ev)    
+    print(bnreasoner.marginal_distribution(Q,e))
+    
