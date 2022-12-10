@@ -177,11 +177,11 @@ class BayesNet:
         else:
             return cpt
 
-    def draw_structure(self) -> None:
+    def draw_structure(self, node_size=3000) -> None:
         """
         Visualize structure of the BN.
         """
-        nx.draw(self.structure, with_labels=True, node_size=3000)
+        nx.draw(self.structure, with_labels=True, node_size=node_size)
         plt.show()
 
     # BASIC HOUSEKEEPING METHODS ---------------------------------------------------------------------------------------

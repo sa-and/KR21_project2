@@ -1,4 +1,5 @@
 # Custom
+.DS_Store
 playground.py
 kr_venv/
 test.ipynb
