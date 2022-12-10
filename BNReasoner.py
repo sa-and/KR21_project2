@@ -96,7 +96,7 @@ class BNReasoner:
         new_cpt  = pd.DataFrame(cpt.groupby(variables_left, as_index=False).agg({'p': 'sum'}))
         
         return new_cpt
-        
+      
     def maxing_out(self, X, cpt):
         """
         This function computes the CPT in which the variable X is maxed-out
@@ -348,5 +348,5 @@ class BNReasoner:
 
 
 if __name__ == "__main__":
-    bayes = BNReasoner('testing/lecture_example.BIFXML')
+    bayes = BNReasoner('testing/stroke_network.BIFXML')
     
