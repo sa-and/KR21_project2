@@ -57,8 +57,8 @@ class BNReasoner_:
                 if len(child) == 0 and v not in Q and v not in e:
                     BayesNet.del_var(new_bn, v)                
                     i += 1    
+        #print(BayesNet.get_all_cpts(new_bn))
         return new_bn  #Niet zeker of dit nodig is
-        
         
     def d_separation(self, bn, X, Y, Z):
         '''
@@ -363,7 +363,8 @@ class BNReasoner_:
         # print()
         # print(to_sum_out_vars)
         # print(e)
-        # #reduce factors   
+
+        #reduce factors by evidence 
         if len(e) != 0:
             for var in f:
                 # print(var)
@@ -523,7 +524,7 @@ class BNReasoner_:
         copyed_p_Q_E = deepcopy(p_Q_E)
         # print(p_Q_E)
         for x in q:
-            print("x =", x)
+            # print("x =", x)
             if [x, 'p'] != list(p_Q_E.columns):
                 p_Q_E = self.maxing_out(p_Q_E, x)
                 # p_Q_E.compare(copyed_p_Q_E, )
@@ -534,13 +535,62 @@ class BNReasoner_:
                 p_Q_E = pd.DataFrame({" ": ["T"], "p":[p]})
             # print("Pr(Q,e)")
             # print(p_Q_E)
-
-
-
         return p_Q_E
 
-    def mpe(self):
-        return
+    def mpe(self, q, e, order = None):
+        #print(list(e.index))
+        pruned_bn = self.Network_Pruning(self.bn, q, list(e.index),e)
+        f = deepcopy(BayesNet.get_all_cpts(pruned_bn))
+        # print(f)
+        
+        #reduce factors by evidence 
+        if len(e) != 0:
+            for var in f:
+                f[var] = BayesNet.get_compatible_instantiations_table(e, f[var])
+        # print(f)
+        all_var = deepcopy(pruned_bn.get_all_variables())
+        print(all_var)
+        if order is None:
+            order = list()
+            r = range(len(all_var))
+            for i in r:
+                in_order = random.choice(all_var)
+                order.append(in_order)
+                all_var.remove(in_order)
+        elif order == "minimum_degree_ordering":
+            order = self.minimum_degree_ordering(pruned_bn, all_var)
+        else:
+            order = self.minimum_fill_ordering(pruned_bn, all_var)
+        print(order)
+
+        done = list()
+        n = None
+        for s in order:
+            to_multiply = list()
+            for var in f:   
+                if var not in done:             
+                    if s in list(f[var].columns):                    
+                        done.append(var)
+                        to_multiply.append(f[var])
+           
+            if n is None:                
+                n = to_multiply[0]
+                if len(to_multiply) > 1:
+                    for factor in to_multiply[1:]:
+                        n = self.multiply_factors(n, factor)                    
+                n = self.maxing_out(n, s)
+                    
+            else:      
+                for factor in to_multiply:
+                    n = self.multiply_factors(n, factor)
+
+                if [s, 'p'] != list(n.columns):
+                    n = self.maxing_out(n, s)
+                else:
+                    p = n["p"].max()
+                    n = pd.DataFrame({" ": ["T"], "p":[p]})
+      
+        return n
 
 Pruning = False
 check_d_separation = False #True
@@ -551,7 +601,7 @@ MultiplyFactor = False#True
 Ordering = False# True
 Variable_Elimination = False#True
 Marginal_distribution = False #True
-Map = True
+Map = False#True
 Mpe = True
 
 if Pruning:
@@ -599,7 +649,6 @@ if MaxingOut:
     cpt = BayesNet.get_cpt(bnreasoner.bn,X)
     print(bnreasoner.maxing_out(cpt,X))
    
-
 if MultiplyFactor:
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
     X = 'Sprinkler?'
@@ -651,7 +700,22 @@ if Map:
         e = pd.Series(data= evidence, index = ev)   
     else:
         e = []
-    bnreasoner.map(q, e)
-# if Mpe:
-#     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
-#     bnreasoner.mpe()
+    print(bnreasoner.map(q, e))
+
+if Mpe:
+    bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
+    evidence = {"Rain?":True, "Winter?": False}
+    ev = list()
+    if len(evidence) != 0:
+        for k in evidence:
+            ev.append(k)
+        e = pd.Series(data= evidence, index = ev)   
+    else:
+        e = []
+    q = list()
+    for var in bnreasoner.bn.get_all_variables():
+        if var not in ev:
+            q.append(var)
+    print(q)
+    print(ev)
+    print(bnreasoner.mpe(q,e))
