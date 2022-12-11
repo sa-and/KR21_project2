@@ -143,7 +143,7 @@ class BNReasoner_:
         '''
 
         #cpt = BayesNet.get_cpt(bn,X)
-        print("before drop")
+        # print("before drop")
         newcpt = cpt.drop([X],axis=1)
 
         
@@ -155,7 +155,7 @@ class BNReasoner_:
         
         return newcpt
 
-    def maxing_out(self,bn,X):#cpt,X):
+    def maxing_out(self,cpt,X):#cpt,X):
         '''
         Given a factor and a variable X, compute the CPT in which X is maxed-out
         :param cpt: a factor
@@ -163,7 +163,7 @@ class BNReasoner_:
         :returns: the CPT in which X is maxed-out
         '''
 
-        cpt = BayesNet.get_cpt(bn,X)
+        #cpt = BayesNet.get_cpt(bn,X)
 
         newcpt = cpt.drop([X],axis=1)
 
@@ -171,8 +171,6 @@ class BNReasoner_:
 
         newcpt = newcpt.groupby(remaining_vars).agg({'p': 'max'})
         newcpt.reset_index(inplace=True)
-
-
         return newcpt
 
     def multiply_factors(self,f,g):
@@ -193,7 +191,7 @@ class BNReasoner_:
 
         # merge two dataframes
         #merged = f.merge(g,left_on=join_var,right_on=join_var)
-        print(len(join_var), " : ", join_var)
+        # print(len(join_var), " : ", join_var)
         if len(join_var) != 0:
             merged = pd.merge(f,g, how="outer", on=join_var)
             # multiply probabilities
@@ -207,9 +205,9 @@ class BNReasoner_:
             merged['p'] = merged['p_x']*merged['p_y']
             # drop individual probability columns
             h = merged.drop(['p_x','p_y'],axis=1)
-            print("merged")
-            print(h)
-            print()
+            # print("merged")
+            # print(h)
+            # print()
         return h
 
     def minimum_fill_ordering(self, bn, set):
@@ -352,7 +350,7 @@ class BNReasoner_:
         :param to_sum_out_vars: List of variables that need to be summed out
         :param e: a series of assignments as tuples, containing the evidence
         :param order: a string containing the type of ordering, if no order is given a random order is picked
-        :return: the factor with all var in the to_sum_out_vars summed out, and when evidence is present, factors reduced
+        :return: the factor with all var in the to_sum_out_vars summed out, and when evidence is present, factors reduced. It also returns a list with the cpts that have been used
         '''
         all_vars = list(BayesNet.get_all_variables(self.bn))
         q = list()
@@ -394,7 +392,7 @@ class BNReasoner_:
         done = list()
         n = None
         #print(to_sum_out_vars)
-        print(order)
+        # print(order)
         for s in order:
             # print("s:")
             # print(s)
@@ -410,50 +408,50 @@ class BNReasoner_:
             # print()
             if n is None:                
                 n = to_multiply[0]
-                print("n = to_multiply[0]")
-                print(n)
+                # print("n = to_multiply[0]")
+                # print(n)
                 if len(to_multiply) > 1:
-                    print("len > 1")
+                    # print("len > 1")
                     for factor in to_multiply[1:]:
                        # print(n)
                         n = self.multiply_factors(n, factor)
-                        print("1. n = self.multiply_factors(n, factor)")
-                        print(n)
+                        # print("1. n = self.multiply_factors(n, factor)")
+                        # print(n)
                     # print(n)
                     # print()
                     
                 n = self.marginalization(n, s)
-                print("1. n = self.marginalization(n, s)")
-                print(n)
+                # print("1. n = self.marginalization(n, s)")
+                # print(n)
                     
             else:      
                 for factor in to_multiply:
                     #print("Wrong")
-                    print("factor:")
-                    print(factor)
-                    print("n:")
-                    print(n)
+                    # print("factor:")
+                    # print(factor)
+                    # print("n:")
+                    # print(n)
                     n = self.multiply_factors(n, factor)
-                    print("2. n = self.multiply_factors(n, factor)")
-                    print(n)
-                    print()
+                    # print("2. n = self.multiply_factors(n, factor)")
+                    # print(n)
+                    # print()
                 
                 # print(list(n.columns))
                 if [s, 'p'] != list(n.columns):
                     n = self.marginalization(n, s)
-                    print("2. n = self.marginalization(n, s)")
-                    print(n)
+                    # print("2. n = self.marginalization(n, s)")
+                    # print(n)
                 else:
                     p = n["p"].sum()
                     # print(p)
                     n = pd.DataFrame({" ": ["T"], "p":[p]})
-                    print(n)
+                    # print(n)
         # for var in q:
         #     if var not in done:
         #         n = self.multiply_factors(n, self.bn.get_cpt(var))
         # print(n)
         # print("-----------")
-        print("Done with VE")
+        # print("Done with VE")
         return n, done    
 
     def joint_prob(self):
@@ -470,7 +468,6 @@ class BNReasoner_:
                 print(n)
         return n
 
-
     def marginal_distribution(self, Q, e = []):  
         '''
         Given query variables Q and possibly empty
@@ -479,32 +476,25 @@ class BNReasoner_:
         be Q = X
         :param Q: list of queri variables
         :param e: a series of assignments as tuples, containing the evidence
+        :returns: marginal distribution P(Q|e)
         '''
-        print("in MD")
         to_sum_out = self.bn.get_all_variables()
         for var in Q:
             to_sum_out.remove(var)  
-        print(to_sum_out)
+        # print(to_sum_out)
 
         if len(to_sum_out) == 0:
             if len(e) == 0:           
-                print(e)            
+                # print(e)            
                 return self.joint_prob()
-            # else:
-            #     n, done = self.variable_elimination(to_sum_out,e)
-            #     print(n)
-            #     for var in Q:
-            #         if var not in done:
-            #             n = self.multiply_factors(n, self.bn.get_all_cpts(var))
-            #     print(n)
         else:
-            print("Pr(Q^e)")
+            # print("Pr(Q^e)")
             cpt, done = self.variable_elimination(to_sum_out, e)
             for var in Q:
                 if var not in done:
-                    print(var)
+                    # print(var)
                     cpt = self.multiply_factors(cpt, self.bn.get_cpt(var))
-                    print(cpt)
+                    # print(cpt)
             #cpt is now the prior marginal of Q
 
             # print("Pr(e)")
@@ -527,8 +517,30 @@ class BNReasoner_:
 
             # print(cpt)
             return cpt
-    def map(self):
-        return 
+    
+    def map(self, q,e):
+        p_Q_E = self.marginal_distribution(q,e)
+        copyed_p_Q_E = deepcopy(p_Q_E)
+        # print(p_Q_E)
+        for x in q:
+            print("x =", x)
+            if [x, 'p'] != list(p_Q_E.columns):
+                p_Q_E = self.maxing_out(p_Q_E, x)
+                # p_Q_E.compare(copyed_p_Q_E, )
+                    
+            else:
+                p = p_Q_E["p"].max()
+                # print(p)
+                p_Q_E = pd.DataFrame({" ": ["T"], "p":[p]})
+            # print("Pr(Q,e)")
+            # print(p_Q_E)
+
+
+
+        return p_Q_E
+
+    def mpe(self):
+        return
 
 Pruning = False
 check_d_separation = False #True
@@ -540,6 +552,7 @@ Ordering = False# True
 Variable_Elimination = False#True
 Marginal_distribution = False #True
 Map = True
+Mpe = True
 
 if Pruning:
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
@@ -629,4 +642,16 @@ if Marginal_distribution:
     
 if Map:
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
-    bnreasoner.map()
+    q = ["Slippery Road?", "Wet Grass?"]
+    evidence = {"Rain?":True, "Winter?": False}
+    ev = list()
+    if len(evidence) != 0:
+        for k in evidence:
+            ev.append(k)
+        e = pd.Series(data= evidence, index = ev)   
+    else:
+        e = []
+    bnreasoner.map(q, e)
+# if Mpe:
+#     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
+#     bnreasoner.mpe()
