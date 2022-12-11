@@ -2,6 +2,7 @@ from typing import Union
 from BayesNet import BayesNet
 import pandas as pd
 from copy import deepcopy
+import random
 
 
 class BNReasoner_:
@@ -142,8 +143,9 @@ class BNReasoner_:
         '''
 
         #cpt = BayesNet.get_cpt(bn,X)
-                
+        print("before drop")
         newcpt = cpt.drop([X],axis=1)
+
         
         remaining_vars = [x for x in newcpt.columns if x != X and x != 'p'] 
           
@@ -191,14 +193,23 @@ class BNReasoner_:
 
         # merge two dataframes
         #merged = f.merge(g,left_on=join_var,right_on=join_var)
-        merged = pd.merge(f,g, how="outer", on=join_var)
-        # multiply probabilities
-        merged['p'] = merged['p_x']*merged['p_y']
+        print(len(join_var), " : ", join_var)
+        if len(join_var) != 0:
+            merged = pd.merge(f,g, how="outer", on=join_var)
+            # multiply probabilities
+            merged['p'] = merged['p_x']*merged['p_y']
 
-        # drop individual probability columns
-        h = merged.drop(['p_x','p_y'],axis=1)
-
-        # return h
+            # drop individual probability columns
+            h = merged.drop(['p_x','p_y'],axis=1)
+        else:
+            merged = pd.merge(f,g, how="cross")
+            # multiply probabilities
+            merged['p'] = merged['p_x']*merged['p_y']
+            # drop individual probability columns
+            h = merged.drop(['p_x','p_y'],axis=1)
+            print("merged")
+            print(h)
+            print()
         return h
 
     def minimum_fill_ordering(self, bn, set):
@@ -336,89 +347,188 @@ class BNReasoner_:
         edges.pop(var)
         return edges, edge_added
 
-    def variable_elimination(self, to_sum_out_vars, e = {}, order =None):#, f = None):
+    def variable_elimination(self, to_sum_out_vars, e = [], order =None):
         '''
-        :param to_sum_out_vars: Set of variables that need to be summed out
-        :param order: a string containing the type of ordering --> misschien gewoon de ordering mee geven (dus al eerder berekenen)
-        :return: the factor with all var in the to_sum_out_vars summed out
+        :param to_sum_out_vars: List of variables that need to be summed out
+        :param e: a series of assignments as tuples, containing the evidence
+        :param order: a string containing the type of ordering, if no order is given a random order is picked
+        :return: the factor with all var in the to_sum_out_vars summed out, and when evidence is present, factors reduced
         '''
-        if order is None:
-            order = to_sum_out_vars
-        elif order == "minimum_degree_ordering":
-            order = self.minimum_degree_ordering(self.bn, to_sum_out_vars)
-        else:
-            order = self.minimum_fill_ordering(self.bn, to_sum_out_vars)
-
-        # if f is None:
-        f = deepcopy(BayesNet.get_all_cpts(self.bn))        
-
-        # order = ["Winter?", "Wet Grass?", "Sprinkler?", "Rain?"]
+        all_vars = list(BayesNet.get_all_variables(self.bn))
+        q = list()
+        for var in all_vars:
+            if var not in to_sum_out_vars:
+                q.append(var)
+        f = deepcopy(BayesNet.get_all_cpts(self.bn))    
+        # print(f)
+        # print()
+        # print()
+        # print(to_sum_out_vars)
+        # print(e)
+        # #reduce factors   
         if len(e) != 0:
             for var in f:
                 # print(var)
                 # print(BayesNet.reduce_factor(e, f[var]))
-                f[var] = BayesNet.reduce_factor(e, f[var])
-                # print(f[var])           
+                # print()
+                f[var] = BayesNet.get_compatible_instantiations_table(e, f[var])
+                # print(f[var]) 
+        # print("--------------")
+        # print(f)
+        # print("--------------")
 
+        #If no order is assigned, the order in which the to sum out variables are given is used as ordering --> misschien random maken?
+        if order is None:
+            order = list()
+            r = range(len(to_sum_out_vars))
+            for i in r:
+                in_order = random.choice(to_sum_out_vars)
+                order.append(in_order)
+                to_sum_out_vars.remove(in_order)
+        elif order == "minimum_degree_ordering":
+            order = self.minimum_degree_ordering(self.bn, to_sum_out_vars)
+        else:
+            order = self.minimum_fill_ordering(self.bn, to_sum_out_vars)                 
+
+        #do the variable elimination
         done = list()
         n = None
         #print(to_sum_out_vars)
-        #print(order)
+        print(order)
         for s in order:
+            # print("s:")
+            # print(s)
             to_multiply = list()
             for var in f:   
                 if var not in done:             
                     if s in list(f[var].columns):                    
                         done.append(var)
                         to_multiply.append(f[var])
-
-            if n is None:
+            # print()
+            # print("to multiply")
+            # print(to_multiply)
+            # print()
+            if n is None:                
                 n = to_multiply[0]
+                print("n = to_multiply[0]")
+                print(n)
                 if len(to_multiply) > 1:
+                    print("len > 1")
                     for factor in to_multiply[1:]:
-                        # print(n)
+                       # print(n)
                         n = self.multiply_factors(n, factor)
+                        print("1. n = self.multiply_factors(n, factor)")
+                        print(n)
                     # print(n)
-                    n = self.marginalization(n, s)
+                    # print()
+                    
+                n = self.marginalization(n, s)
+                print("1. n = self.marginalization(n, s)")
+                print(n)
                     
             else:      
                 for factor in to_multiply:
-                    # print(n)
+                    #print("Wrong")
+                    print("factor:")
+                    print(factor)
+                    print("n:")
+                    print(n)
                     n = self.multiply_factors(n, factor)
-                # print("1")
-                # print(n)
-                # print("2")
-                n = self.marginalization(n, s)
+                    print("2. n = self.multiply_factors(n, factor)")
+                    print(n)
+                    print()
+                
+                # print(list(n.columns))
+                if [s, 'p'] != list(n.columns):
+                    n = self.marginalization(n, s)
+                    print("2. n = self.marginalization(n, s)")
+                    print(n)
+                else:
+                    p = n["p"].sum()
+                    # print(p)
+                    n = pd.DataFrame({" ": ["T"], "p":[p]})
+                    print(n)
+        # for var in q:
+        #     if var not in done:
+        #         n = self.multiply_factors(n, self.bn.get_cpt(var))
         # print(n)
         # print("-----------")
-        return n    
+        print("Done with VE")
+        return n, done    
 
-    def marginal_distribution(self, Q, e):  
-        to_sum_out = BayesNet.get_all_variables(self.bn)
+    def joint_prob(self):
+        cpts = self.bn.get_all_cpts()
+        print(cpts)
+        i = 0
+        for var in (cpts):
+            if i == 0:
+                n = cpts[var]
+                print(n)
+                i+=1
+            else:
+                n = self.multiply_factors(n, cpts[var])
+                print(n)
+        return n
+
+
+    def marginal_distribution(self, Q, e = []):  
+        '''
+        Given query variables Q and possibly empty
+        evidence e, compute the marginal distribution P(Q|e). Note that Q is a
+        subset of the variables in the Bayesian network X with Q ⊂ X but can also
+        be Q = X
+        :param Q: list of queri variables
+        :param e: a series of assignments as tuples, containing the evidence
+        '''
+        print("in MD")
+        to_sum_out = self.bn.get_all_variables()
         for var in Q:
             to_sum_out.remove(var)  
-        if len(e) == 0:           
-            return self.variable_elimination(to_sum_out)
+        print(to_sum_out)
+
+        if len(to_sum_out) == 0:
+            if len(e) == 0:           
+                print(e)            
+                return self.joint_prob()
+            # else:
+            #     n, done = self.variable_elimination(to_sum_out,e)
+            #     print(n)
+            #     for var in Q:
+            #         if var not in done:
+            #             n = self.multiply_factors(n, self.bn.get_all_cpts(var))
+            #     print(n)
         else:
-            # print("Pr(Q^e)")
-            cpt = self.variable_elimination(to_sum_out, e)
+            print("Pr(Q^e)")
+            cpt, done = self.variable_elimination(to_sum_out, e)
+            for var in Q:
+                if var not in done:
+                    print(var)
+                    cpt = self.multiply_factors(cpt, self.bn.get_cpt(var))
+                    print(cpt)
+            #cpt is now the prior marginal of Q
+
             # print("Pr(e)")
             # print(cpt)
-            
-            Pr_e = cpt["p"].sum()
-            # print(Pr_e)
-            list_to_be = list()
-            list_p = list()
-            for ind in cpt.index:
-                list_to_be.append(cpt['p'][ind]/Pr_e)
-                list_p.append(cpt['p'][ind])
-            # print(list_to_be)
-            # print(list_p)           
-            
-            for i in range(len(list_to_be)):
-                cpt['p'] = cpt['p'].replace(to_replace=list_p[i], value=list_to_be[i])
+            if len(e) != 0:    
+                # if len(e) == 1:
+                Pr_e = cpt["p"].sum()
+                # print(Pr_e)
+                list_to_be = list()
+                list_p = list()
+                for ind in cpt.index:
+                    list_to_be.append(cpt['p'][ind]/Pr_e)
+                    list_p.append(cpt['p'][ind])
+                # print(list_to_be)
+                # print(list_p)           
+                
+                for i in range(len(list_to_be)):
+                    cpt['p'] = cpt['p'].replace(to_replace=list_p[i], value=list_to_be[i])
+                    #cpt is now the posterior marginal of Q
+
             # print(cpt)
             return cpt
+    def map(self):
+        return 
 
 Pruning = False
 check_d_separation = False #True
@@ -428,23 +538,24 @@ MaxingOut = False
 MultiplyFactor = False#True
 Ordering = False# True
 Variable_Elimination = False#True
-Marginal_distribution = True
+Marginal_distribution = False #True
+Map = True
 
 if Pruning:
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
-    Queri, evidence = {"Winter?"}, {"Rain?": True}
+    Queri, evidence = ["Winter?"], {"Rain?": True}
     #Is needed for pd.Series
-    e = set()
+    e = list()
     for k in evidence:
-        e.add(k)
+        e.append(k)
     bnreasoner.Network_Pruning(bnreasoner.bn, Queri, e, pd.Series(data= evidence, index = e))
 
 #determine whether X is d-seperated from Y by Z
 if check_d_separation:
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
-    Y = {"Slippery Road?"}
-    X = {"Wet Grass?"}
-    Z = {"Rain?"} 
+    Y = ["Slippery Road?"]
+    X = ["Wet Grass?"]
+    Z = ["Rain?"]
     if bnreasoner.d_separation(bnreasoner.bn, X,Y,Z):
         print(X, "is d-separated from ", Y, "by ", Z)
     else:
@@ -455,8 +566,8 @@ if Independence:
     #maar I guess dat het werkt, het is gebaseerd op DAGs en de Markov Property en Symmetry
     #zijn denk ik geimplementeerd.
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
-    Y = {"Winter?"}
-    X = {"Slippery Road?"}
+    Y = ["Winter?"]
+    X = ["Slippery Road?"]
     Z = {} 
     if bnreasoner.independence(bnreasoner.bn, X,Y,Z):
         print(X, "is independent from ", Y, "given ", Z)
@@ -486,22 +597,36 @@ if MultiplyFactor:
     
 if Ordering:
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
-    Set = {"Sprinkler?", "Rain?"}#BayesNet.get_all_variables(bnreasoner.bn)
+    Set = ["Sprinkler?", "Rain?"]#BayesNet.get_all_variables(bnreasoner.bn)
     print(bnreasoner.minimum_degree_ordering(bnreasoner.bn, Set))
     print(bnreasoner.minimum_fill_ordering(bnreasoner.bn, Set))
 
 if Variable_Elimination:
-    Set = {"Rain?", "Winter?", "Sprinkler?", "Wet Grass?"}#, "Winter"}
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
-    print(bnreasoner.variable_elimination(to_sum_out_vars=Set, order = "minimum_degree_ordering"))
+    Set = ["Winter?", "Rain?", "Sprinkler?"]
+    # print(Set)
+    print("VE")
+    Pr_set, _ = bnreasoner.variable_elimination(to_sum_out_vars=Set)#, order = "minimum_degree_ordering"))
+    print(Pr_set)
+    print("VE")
 
-if Marginal_distribution == True:
+if Marginal_distribution:
+    #Ik weet niet zeker of deze klopt
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
-    Q = {"Slippery Road?", "Wet Grass?"}
-    evidence = {"Rain?": True, "Sprinkler?": False}
-    ev = set()
-    for k in evidence:
-        ev.add(k)
-    e = pd.Series(data= evidence, index = ev)    
-    print(bnreasoner.marginal_distribution(Q,e))
+    q = ["Slippery Road?", "Wet Grass?"]
+    evidence = {"Rain?":True, "Winter?": False}
+    ev = list()
+    if len(evidence) != 0:
+        for k in evidence:
+            ev.append(k)
+        e = pd.Series(data= evidence, index = ev)   
+    else:
+        e = []
+        # e = pd.Series(data= evidence, index = ev)   
+        # print(e)
+    #print(q, e)
+    print(bnreasoner.marginal_distribution(q,e))
     
+if Map:
+    bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
+    bnreasoner.map()
