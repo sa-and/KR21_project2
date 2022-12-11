@@ -60,14 +60,14 @@ class BNReasoner_:
         #print(BayesNet.get_all_cpts(new_bn))
         return new_bn  #Niet zeker of dit nodig is
         
-    def d_separation(self, bn, X, Y, Z):
+    def d_separation(self, X, Y, Z):
         '''
         :param bn: Bayes network
         :param X, Y, Z: sets of var of which you want to know whether they are d-separated by Z
         :returns: True if X and Y are d-separated, False if they are not d-separated by Z
         '''        
-        q = X.union(Y)
-        self.Network_Pruning(bn, q, Z)
+        q = X + Y
+        bn = self.Network_Pruning(self.bn, q, Z)
         
         #If there is no path between X and Y (order does not matter) means X and Y are d-separated
         for x in X:
@@ -592,8 +592,8 @@ class BNReasoner_:
       
         return n
 
-Pruning = False
-check_d_separation = False #True
+Pruning = True#False
+check_d_separation = False#True
 Independence = False #True
 Marginalization = False
 MaxingOut = False
@@ -602,7 +602,7 @@ Ordering = False# True
 Variable_Elimination = False#True
 Marginal_distribution = False #True
 Map = False#True
-Mpe = True
+Mpe = False#True
 
 if Pruning:
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
@@ -611,7 +611,7 @@ if Pruning:
     e = list()
     for k in evidence:
         e.append(k)
-    bnreasoner.Network_Pruning(bnreasoner.bn, Queri, e, pd.Series(data= evidence, index = e))
+    BayesNet.draw_structure(bnreasoner.Network_Pruning(bnreasoner.bn, Queri, e, pd.Series(data= evidence, index = e)))
 
 #determine whether X is d-seperated from Y by Z
 if check_d_separation:
@@ -619,7 +619,7 @@ if check_d_separation:
     Y = ["Slippery Road?"]
     X = ["Wet Grass?"]
     Z = ["Rain?"]
-    if bnreasoner.d_separation(bnreasoner.bn, X,Y,Z):
+    if bnreasoner.d_separation(X,Y,Z):
         print(X, "is d-separated from ", Y, "by ", Z)
     else:
         print(X, "is not d-separated from ", Y, "by ", Z)
