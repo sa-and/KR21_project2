@@ -1,0 +1,36 @@
+<?xml version='1.0' encoding='utf-8'?>
+<BIF VERSION="0.3">
+  <NETWORK>
+    <NAME>UNTITLED</NAME>
+    <VARIABLE TYPE="nature">
+      <NAME>0</NAME>
+      <OUTCOME>0</OUTCOME>
+      <OUTCOME>1</OUTCOME>
+      <PROPERTY>weight = None</PROPERTY>
+    </VARIABLE>
+    <VARIABLE TYPE="nature">
+      <NAME>1</NAME>
+      <OUTCOME>0</OUTCOME>
+      <OUTCOME>1</OUTCOME>
+      <PROPERTY>weight = None</PROPERTY>
+    </VARIABLE>
+    <VARIABLE TYPE="nature">
+      <NAME>2</NAME>
+      <OUTCOME>0</OUTCOME>
+      <OUTCOME>1</OUTCOME>
+      <PROPERTY>weight = None</PROPERTY>
+    </VARIABLE>
+    <DEFINITION>
+      <FOR>0</FOR>
+      <TABLE>0.07253759860459827 0.9274624013954017 </TABLE>
+    </DEFINITION>
+    <DEFINITION>
+      <FOR>1</FOR>
+      <TABLE>0.5068902347397577 0.49310976526024225 </TABLE>
+    </DEFINITION>
+    <DEFINITION>
+      <FOR>2</FOR>
+      <TABLE>0.36710673327175425 0.6328932667282459 </TABLE>
+    </DEFINITION>
+  </NETWORK>
+</BIF>
