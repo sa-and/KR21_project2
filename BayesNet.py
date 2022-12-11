@@ -3,6 +3,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from pgmpy.readwrite import XMLBIFReader
 import math
+import random
 import itertools
 import pandas as pd
 from copy import deepcopy
@@ -229,9 +230,21 @@ class BayesNet:
 
     # CUSTOM METHODS ----------------------------------------------------------
     def is_leaf_node(self, node: str) -> bool:
+        """
+        Returns True if the given node has no outgoing edges and False otherwise
+        :param: The node being queried
+        :return: True/False
+        """
         return self.structure.out_degree(node) == 0
 
-    def out_edges(self, node: str) -> List:
+    def all_leaves(self) -> List[str]:
+        """
+        return: A list of leaf nodes in the BN
+        """
+        return [node for node in self.structure.nodes() if self.structure.out_degree(node) == 0]
+
+
+    def out_edges(self, node: str) -> List[Tuple[str, str]]:
         """
         Returns a list of outgoing edges from the given node
         :param node: A string for the name of the node
@@ -239,10 +252,55 @@ class BayesNet:
         """
         return self.structure.out_edges(node)
     
-    def all_reachable(self, node):
+    def all_reachable(self, node: str) -> List[str]:
         """
         Returns a list of nodes reachable from the given node
         :param node: A string for the name of the node
         :return: A list of nodes reachable from the given one
         """
         return list(nx.shortest_path(self.structure.to_undirected(), node).keys())
+    
+    def rand_Qe(self, q_ratio: float, e_ratio: float) -> Tuple[List[str], List[str]]:
+        """
+        Generates a random list of nodes for Q and e. The number of nodes is 
+        determined by the given ratios of the graph size. If this number is less 
+        than zero, a single node is chosen at random
+        :param q_ratio: The fraction of nodes to appear in Q (rounded down)
+        :param e_ratio: The fraction of nodes to appear in e (rounded down)
+        :return: A tuple containing a list of nodes in Q and e respectively
+        :raises ValueError: If a ratio is less than 0
+        :raises ValueError: If q_ratio + e_ratio > 1
+        """
+
+        # Input checks
+        if (q_ratio < 0) or (e_ratio < 0):
+            raise ValueError('Ratios must be in the range [0, 1]')
+        
+        if q_ratio + e_ratio > 1:
+            raise ValueError('The sum of ratios must be less than 1')
+        
+        # Determine the number of nodes to sample
+        nodes = list(self.structure.nodes())
+        size = len(nodes)
+
+        num_Q = max(int(q_ratio * size), 1)
+        num_e = max(int(e_ratio * size), 1)
+
+        # Randomize sampling order
+        q_first = random.randint(0, 1)
+
+        # Sample
+        if q_first:
+            Q = random.sample(nodes, num_Q)
+            remaining_nodes = list(set(nodes) - set(Q))
+            e = random.sample(remaining_nodes, num_e)
+        else: # e first
+            e = random.sample(nodes, num_e)
+            remaining_nodes = list(set(nodes) - set(e))
+            Q = random.sample(remaining_nodes, num_Q)
+        
+        return (Q, e)
+
+        
+
+        
