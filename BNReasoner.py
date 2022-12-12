@@ -3,8 +3,7 @@ from functools import partial
 from typing import List
 from typing import Union
 from BayesNet import BayesNet
-import itertools
-from copy import deepcopy 
+import itertools 
 import networkx as nx
 from copy import deepcopy
 
