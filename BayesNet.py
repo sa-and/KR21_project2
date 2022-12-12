@@ -114,7 +114,7 @@ class BayesNet:
 
         return cpts
 
-    def get_interaction_graph(self):
+    def get_interaction_graph(self) -> nx.Graph:
         """
         Returns a networkx.Graph as interaction graph of the current BN.
         :return: The interaction graph based on the factors of the current BN.
