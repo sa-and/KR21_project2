@@ -20,10 +20,46 @@ class BNReasoner:
         else:
             self.bn = net
 
-    def __get_leaves(self, exclude=None) -> List[str]:
-        exclude = set() if exclude is None else exclude
-        return [v for v in self.bn.get_all_variables() 
-                        if len(self.bn.get_children(v)) == 0]
+    @staticmethod
+    def leaves(bn: BayesNet) -> set[str]:
+        vars = bn.get_all_variables()
+        ls = set()
+        for v in vars:
+            if len(bn.get_children(v)) == 0:
+                ls.add(v)
+        return ls
+
+    @staticmethod
+    def has_undirected_path(bn: BayesNet, x: str, Y: set[str]):
+        visited = [x]
+        seen = set()
+        while len(visited) > 0:
+            node = visited.pop(0)
+            seen.add(node)
+            ancs = BNReasoner.parents(bn, node) - seen
+            children = set(bn.get_children(node)) - seen
+            if len(Y.intersection(children.union(ancs))) > 0:
+                return True
+            visited.extend(ancs)
+            visited.extend(children)
+        return False
+
+    @staticmethod
+    def parents(bn: BayesNet, x: str) -> set[str]:
+        rents = set()
+        for var in bn.get_all_variables():
+            if x in bn.get_children(var):
+                rents.add(var)
+        return rents
+
+    @staticmethod
+    def ancestors(bn: BayesNet, x: str) -> set[str]:
+        ancs = set()
+        all_vars = set(bn.get_all_variables())
+        for var in all_vars - {x}:
+            if BNReasoner.has_path(var, {x}):
+                ancs.add(var)
+        return ancs
 
     @staticmethod
     def has_path(bn: BayesNet, x: str, Y: set[str]) -> bool:
@@ -43,10 +79,10 @@ class BNReasoner:
     @staticmethod
     def disconnected(bn: BayesNet, X: set[str], Y: set[str]) -> bool:
         for x in X:
-            if BNReasoner.has_path(bn, x, Y):
+            if BNReasoner.has_undirected_path(bn, x, Y):
                 return False
         for y in Y:
-            if BNReasoner.has_path(bn, y, X):
+            if BNReasoner.has_undirected_path(bn, y, X):
                 return False
         return True
 
@@ -121,22 +157,12 @@ class BNReasoner:
             self.bn.del_var(leaf)
             leaves = leaves.union(BNReasoner.leaves(self.bn) - set(e_vars.union(Q)))
 
-    @staticmethod
-    def leaves(bn: BayesNet) -> set[str]:
-        vars = bn.get_all_variables()
-        ls = set()
-        for v in vars:
-            if len(bn.get_children(v)) == 0:
-                ls.add(v)
-        return ls
-
     def dsep(self, X: set[str], Y: set[str], Z: set[str]) -> bool:
         """
         Given three sets of variables X, Y, and Z, determine whether X is d-separated 
         of Y given Z. (4pts)
         """
         bn = deepcopy(self.bn)
-        breakpoint()
         while True:
             leaves = BNReasoner.leaves(bn) - X.union(Y).union(Z)
             had_leaves = bool(len(leaves))
@@ -146,8 +172,8 @@ class BNReasoner:
             had_edges = bool(len(zout_edges))
             if not had_edges and not had_leaves:
                 break
-            for edge in zout_edges:
-                bn.del_edge(edge)
+            for u,v in zout_edges:
+                bn.del_edge((u, v))
             for leaf in leaves:
                 bn.del_var(leaf)
         return BNReasoner.disconnected(bn, X, Y)
@@ -204,7 +230,6 @@ class BNReasoner:
         Given a factor and a variable X, compute the CPT in which X is summed-out. (3pts)
         """
         return self._compute_new_cpt(factor, x, 'sum')
-        
 
     def maxing_out(self, factor, x):
         """
@@ -288,7 +313,6 @@ class BNReasoner:
                 name = i 
         return name 
 
-
     def marginal_distribution(self, Q, e):
         """Given query variables Q and possibly empty evidence e, 
         compute the marginal distribution P(Q|e). Note that Q is a subset of 
@@ -315,15 +339,23 @@ def test_prune():
 
 
 def test_dsep():
+    """
+    This tests the d-separation method on our BNReasoner class taking examples form the lecture
+    notes PGM2_22.pdf page 33.
+    """
     reasoner = BNReasoner('testing/lecture_example3.BIFXML')
     assert reasoner.dsep(set(['Visit to Asia?', 'Smoker?']), set(['Dyspnoea?', 'Positive X-Ray?']), set(['Bronchitis?', 'Tuberculosis or Cancer?']))
-    assert reasoner.dsep(set(['Tuberculosis?', 'Lung Cancer?']), set(['Bronchitis?']), set(['Positive X-Ray?']))
+    assert reasoner.dsep(set(['Tuberculosis?', 'Lung Cancer?']), set(['Bronchitis?']), set(['Smoker?', 'Positive X-Ray?']))
+    assert reasoner.dsep(set(['Positive X-Ray?', 'Smoker?']), set(['Dyspnoea?']), set(['Bronchitis?', 'Tuberculosis or Cancer?']))
+    assert reasoner.dsep(set(['Positive X-Ray?']), set(['Smoker?']), set(['Lung Cancer?']))
     assert not reasoner.dsep(set(['Positive X-Ray?']), set(['Smoker?']), set(['Dyspnoea?', 'Lung Cancer?']))
+    breakpoint()
 
 
 def main():
+    test_dsep()
     reasoner = BNReasoner('testing/lecture_example.BIFXML')
-    reasoner.min_degree(["Wet Grass?", "Sprinkler?", "Slippery Road?", "Rain?", "Winter?"])
+    # print(reasoner.min_degree_ordering(["Wet Grass?", "Sprinkler?", "Slippery Road?", "Rain?", "Winter?"]))
 
 
 if __name__ == '__main__':
