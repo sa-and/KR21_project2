@@ -4,6 +4,8 @@ from typing import List
 from typing import Union
 from BayesNet import BayesNet
 import itertools
+from copy import deepcopy 
+import networkx as nx
 
 
 class BNReasoner:
@@ -161,6 +163,7 @@ class BNReasoner:
                 inst_list.append(inst[j])
             inst_series = pd.Series(inst_dict)
             comp_inst = self.bn.get_compatible_instantiations_table(inst_series, self.bn.get_cpt(factor))
+            print(comp_inst)
             if which == 'max':
                 new_p = comp_inst.p.max()  
             elif which == 'sum':  
@@ -246,18 +249,72 @@ class BNReasoner:
         compute a good ordering for the elimination of X based on the min-degree heuristics (2pts) 
         and the min-fill heuristics (3.5pts). (Hint: you get the interaction graph ”for free” 
         from the BayesNet class.)"""
-        graph = self.bn.get_interaction_graph()
-        
+        interaction_graph = self.bn.get_interaction_graph()
+        order = []
 
-        pass
-        
+        for i in range(len(X)): 
+            Lowest_degree = self.lowest_degree(interaction_graph, X)
+            order.append(Lowest_degree)
+            interaction_graph = self.remove_node_interaction(Lowest_degree, interaction_graph)
+            X.remove(Lowest_degree)
+        print(order)
+        return order
+    
+    def remove_node_interaction(self, node, graph): 
+        neighbours = [n for n in nx.neighbors(graph, node)]
+        for neighbour in neighbours:
+            copy_neighbours = deepcopy(neighbours)
+            copy_neighbours.remove(neighbour)
+            for i in copy_neighbours: 
+                if not(self.nodes_connected(neighbour, i, graph)): 
+                    graph.add_edge(neighbour, i)
+        graph.remove_node(node)               
+        return graph
+    
+    def minfill_ordering(self, X):
+        interaction_graph = self.bn.get_interaction_graph()
+        order = []
+
+        for i in range(len(X)): 
+            lowest_fill = self.lowest_fill(interaction_graph, X)
+            order.append(lowest_fill)
+            interaction_graph = self.remove_node_interaction(lowest_fill, interaction_graph)
+            X.remove(lowest_fill)
+        print(order)
+        return order
+   
+    def lowest_fill(self, graph, X):
+        lowest_fill = 100
+        name = "test"
+        for var in X: 
+            amount = self.amount_added_interaction(var, graph)
+            if amount < lowest_fill: 
+                lowest_fill = amount 
+                name = var 
+        return name
+
+    
+    def amount_added_interaction(self, x, graph): 
+        neighbours = [n for n in nx.neighbors(graph, x)]
+        added_count = 0 
+        for neighbour in neighbours:
+            copy_neighbours = deepcopy(neighbours)
+            copy_neighbours.remove(neighbour)
+            for i in copy_neighbours: 
+                if not(self.nodes_connected(neighbour, i, graph)): 
+                    added_count += 1   
+        return added_count/2
+       
+
+    def nodes_connected(self,u,v,graph): 
+        return u in graph.neighbors(v)    
+
     def lowest_degree(self, graph, X):
         lowest_degree = 100
         name = "test" 
 
         for i in X:
             value = graph.degree[i]
-            print(value)
             if value < lowest_degree:
                 lowest_degree = value
                 name = i 
@@ -268,6 +325,15 @@ class BNReasoner:
         """Given query variables Q and possibly empty evidence e, 
         compute the marginal distribution P(Q|e). Note that Q is a subset of 
         the variables in the Bayesian network X with Q ⊂ X but can also be Q = X. (2.5pts)"""
+        for var in e.keys():
+             
+            for i in Q: 
+                if  var in self.bn.get_cpt(i).columns:
+                    table_i_var = self.bn.get_compatible_instantiations_table(pd.Series({var: e[var]}), self.bn.get_cpt(i))
+        
+
+        #Reduce all factors w.r.t. e
+
 
         # calculation of joint marginal 
         # joint marginal by chain rule
@@ -293,16 +359,16 @@ def test_prune(reasoner: BNReasoner):
 def main():
     reasoner = BNReasoner('testing/lecture_example.BIFXML')
     # breakpoint()
-    #reasoner.maxing_out('Wet Grass?', 'Sprinkler?')
+    reasoner.maxing_out('Wet Grass?', 'Sprinkler?')
     # reasoner.bn.draw_structure()
     # print(reasoner._pr('Slippery Road?'))
     # print(reasoner._pr('Rain?'))
     # reasoner.prune(set(['Slippery Road?']), set(['Rain?']))
     # breakpoint()
     #reasoner.factor_mult("Wet Grass?", "Sprinkler?")
-
-    reasoner.min_degree(["Wet Grass?", "Sprinkler?", "Slippery Road?", "Rain?", "Winter?"])
-
-
+    #reasoner.bn.draw_structure()
+    #reasoner.min_degree_ordering({"Wet Grass?", "Sprinkler?", "Slippery Road?", "Rain?", "Winter?"})
+    #print(reasoner.bn.get_all_cpts())
+    #reasoner.minfill_ordering({"Wet Grass?", "Sprinkler?", "Slippery Road?", "Rain?", "Winter?"})
 if __name__ == '__main__':
     main()
