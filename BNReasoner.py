@@ -108,21 +108,18 @@ class BNReasoner:
         for e_var in e_vars:
             children = self.bn.get_children(e_var)
             for child in children:
-                self.bn.del_edge((e_var, child))
-        # ignore_vars = ['p', *(list(Q.union(E)))]
-        # breakpoint()
-        # for q in Q.union(E):
-        #     cpt = self.bn.get_cpt(q)
-        #     deps = [col for col in cpt.columns if col not in ignore_vars]
-        #     deps = self.get_ordered(deps)
-        #     for dep in deps:
-        #         pr = self._pr(dep)
-        #         cpt = self.__prune_variable(cpt, dep, pr)
-        #         self.bn.update_cpt(q, cpt)
-        #     self.bn.update_cpt(q, cpt)
-        # rem_nodes = set(self.bn.get_all_variables()) - Q
-        # for node in rem_nodes:
-        #     self.bn.del_var(node)
+                self.bn.del_edge((e_var, child)) # Edge prune
+                child_cpt = self.bn.get_cpt(child)
+                reduced = BayesNet.reduce_factor(e, child_cpt) # Replace child cpt by reduced cpt
+                reduced = reduced[reduced.p > 0.] # Delete any rows where probability is 0
+                self.bn.update_cpt(child, reduced)
+
+        # Node pruning after edge pruning
+        leaves = BNReasoner.leaves(self.bn) - set(e_vars.union(Q))
+        while len(leaves) > 0:
+            leaf = leaves.pop()
+            self.bn.del_var(leaf)
+            leaves = leaves.union(BNReasoner.leaves(self.bn) - set(e_vars.union(Q)))
 
     @staticmethod
     def leaves(bn: BayesNet) -> set[str]:
@@ -306,12 +303,15 @@ class BNReasoner:
         #Compute p(Q|e) = joint marginal/pr(e)
 
 
-def test_prune(reasoner: BNReasoner):
-    vars = reasoner.bn.get_all_variables()
-    vars = sorted(vars, key=reasoner.num_deps)
-    pre_prune = reasoner._pr(vars[4])
-    reasoner.prune(set(vars[:4]), set(vars[-1:]))
-    assert pre_prune == reasoner._pr(vars[4])
+def test_prune():
+    reasoner = BNReasoner('testing/lecture_example.BIFXML')
+    e = pd.Series({'Rain?': False})
+    Q = {'Slippery Road?', 'Winter?'}
+    reasoner.prune(Q, e)
+    assert 'Wet Grass?' not in reasoner.bn.get_all_variables()
+    assert 'Slippery Road?' not in reasoner.bn.get_children('Rain?')
+    assert reasoner._pr('Slippery Road?') == 0.0
+    assert reasoner._pr('Winter?') == 0.6
 
 
 def test_dsep():
