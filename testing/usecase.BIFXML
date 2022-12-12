@@ -96,17 +96,17 @@
 <!-- Probability distributions -->
 <DEFINITION>
 	<FOR>excessive-alcohol-use</FOR>
-	<TABLE>0.5 0.5 </TABLE>
+	<TABLE>0.240 0.760 </TABLE>
 </DEFINITION>
 
 <DEFINITION>
 	<FOR>hepatitis</FOR>
-	<TABLE>0.5 0.5 </TABLE>
+	<TABLE>0.046 0.954 </TABLE>
 </DEFINITION>
 
 <DEFINITION>
 	<FOR>genetic-predisposition-cancer</FOR>
-	<TABLE>0.5 0.5 </TABLE>
+	<TABLE>0.1 0.9 </TABLE>
 </DEFINITION>
 
 <DEFINITION>
