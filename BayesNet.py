@@ -229,6 +229,19 @@ class BayesNet:
         self.structure.remove_edge(edge[0], edge[1])
 
     # CUSTOM METHODS ----------------------------------------------------------
+    def get_num_nodes(self) -> int:
+        """
+        :return: An integer for the number of nodes in the network
+        """
+        return self.structure.number_of_nodes()
+
+    def get_num_edges(self) -> int:
+        """
+        :return: An integer for the number of edges in the network
+        """
+        return self.structure.number_of_edges()
+
+
     def is_leaf_node(self, node: str) -> bool:
         """
         Returns True if the given node has no outgoing edges and False otherwise
