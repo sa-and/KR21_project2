@@ -153,8 +153,8 @@
 
 <DEFINITION>
 	<FOR>colon-cancer</FOR>
-	<GIVEN>excessive-alcohol-use</GIVEN>
 	<GIVEN>genetic-predisposition-cancer</GIVEN>
+	<GIVEN>excessive-alcohol-use</GIVEN>
 	<TABLE>0.97 0.03 0.30 0.70 0.50 0.50 0.05 0.95 </TABLE>
 </DEFINITION>
 
