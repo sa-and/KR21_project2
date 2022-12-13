@@ -276,7 +276,7 @@ class BNReasoner:
         factor_table_g = self.bn.get_cpt(factor_g)
         return self._mult_as_factor(factor_table_f, factor_table_g)
 
-    def eliminate_factor_or_variable(self, vorf: str, nname: str) -> pd.DataFrame:
+    def _eliminate_factor_or_variable(self, vorf: str, nname: str) -> pd.DataFrame:
         d_factors = set(self.bn.get_children(nname))
         if len(d_factors) == 0: # if no children, eliminate immediately
             return None
@@ -288,7 +288,7 @@ class BNReasoner:
         cpt = self._compute_new_cpt(cpt, vorf, 'sum')
         return cpt
 
-    def get_elim_order(self, vars, elim_method):
+    def _get_elim_order(self, vars, elim_method):
         if elim_method == 'min_degree':
             return self.min_degree_ordering(vars)
         elif elim_method == 'min_fill':
@@ -306,11 +306,11 @@ class BNReasoner:
         Following https://ermongroup.github.io/cs228-notes/inference/ve/
         """
         to_eliminate = set(self.bn.get_all_variables()) - X
-        to_eliminate = self.get_elim_order(to_eliminate, elim_method)
+        to_eliminate = self._get_elim_order(to_eliminate, elim_method)
         for var in to_eliminate:
             nname = self.get_node_or_factor_name(var)
             parents = self.parents(self.bn, nname)
-            jmpt = self.eliminate_factor_or_variable(var, nname)
+            jmpt = self._eliminate_factor_or_variable(var, nname)
             if jmpt is None:
                 self.bn.del_var(nname)
                 continue
@@ -429,6 +429,18 @@ class BNReasoner:
                 name = i 
         return name 
 
+    def map(self, Q: set[str], e: pd.Series):
+        """Compute the maximum a-posteriory instantiation + value of query variables Q, given a possibly empty evidence e. (3pts)"""
+        vars_to_keep = Q.union(set(e.index))
+        jptd = self.variable_elimination(vars_to_keep, 'min_degree')
+
+        breakpoint()
+        jptd = BayesNet.reduce_factor(e, jptd)
+        row = jptd.iloc[pd.to_numeric(jptd.p).idxmax()]
+        del row['p']
+        return row
+
+
     def marginal_distribution(self, Q, e):
         """Given query variables Q and possibly empty evidence e, 
         compute the marginal distribution P(Q|e). Note that Q is a subset of 
@@ -475,15 +487,12 @@ def test_dsep():
 
 
 def main():
-    # test_dsep()
     reasoner = BNReasoner('testing/lecture_example3.BIFXML')
-    jptd = reasoner.variable_elimination(set(['Smoker?', 'Tuberculosis?']), 'min_degree')
-    print(jptd)
+    e = pd.Series({'Smoker?': True, 'Bronchitis?': False})
+    Q = {'Lung Cancer?', 'Dyspnoea?', 'Positive X-Ray?'}
+    # jptd = reasoner.variable_elimination(set(['Smoker?', 'Tuberculosis?']), 'min_degree')
+    print(reasoner.map(Q, e))
     breakpoint()
-    # reasoner.maxing_out('Wet Grass?', 'Sprinkler?')
-    # reasoner = BNReasoner('testing/lecture_example3.BIFXML')
-    # reasoner.factor_mult('Visit to Asia?', 'Tuberculosis?')
-
 
 if __name__ == '__main__':
     main()
