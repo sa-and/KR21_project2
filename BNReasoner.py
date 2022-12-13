@@ -375,20 +375,17 @@ class BNReasoner:
         """Given query variables Q and possibly empty evidence e, 
         compute the marginal distribution P(Q|e). Note that Q is a subset of 
         the variables in the Bayesian network X with Q ⊂ X but can also be Q = X. (2.5pts)"""
-        for var in e.keys():
-             
-            for i in Q: 
-                if  var in self.bn.get_cpt(i).columns:
-                    table_i_var = self.bn.get_compatible_instantiations_table(pd.Series({var: e[var]}), self.bn.get_cpt(i))
-        
-
         #Reduce all factors w.r.t. e
-
-
+        if not len(e)==0 :
+            reduce_tables = self.bn.reduce_factor(e)
+        else: 
+            tables = self.bn.get_all_cpts()
+         
         # calculation of joint marginal 
+        #use variable elimination 
+
         # joint marginal by chain rule
-        Z = Q.append(e)
-    
+        
         #sum out Q, to calculate Pr(e) 
 
         #Compute p(Q|e) = joint marginal/pr(e)
