@@ -101,7 +101,7 @@ class BNReasoner:
 
     def _get_default_ordering(self, deps):
         return deps
-    
+
     def get_ordered(self, deps):
         """
         This can call any number of heuristics-based implementations that
@@ -190,6 +190,8 @@ class BNReasoner:
         f = pd.DataFrame(columns = factor_table.columns)
         f["p"]= []
         del f[x]
+        if which == "max":
+            f["instantiation"] = []
 
         l = [False, True]
         instantiations = [list(i) for i in itertools.product(l, repeat = len(factor_table.columns) - 2)]
@@ -208,12 +210,18 @@ class BNReasoner:
             print(comp_inst)
             if which == 'max':
                 new_p = comp_inst.p.max()  
+                instantiation = comp_inst.loc[comp_inst["p"] == new_p][x].values[0]
+                print(instantiation)
+                inst_list.append(new_p)
+                inst_list.append(instantiation)
             elif which == 'sum':  
                 new_p = comp_inst.p.sum()
-            inst_list.append(new_p)
+                inst_list.append(new_p)
+            
             f.loc[count] = inst_list
 
-            count += 1
+            count += 1 
+        print(f)
 
         return f
 
@@ -417,11 +425,11 @@ def test_dsep():
 
 
 def main():
-    test_dsep()
+    # test_dsep()
     reasoner = BNReasoner('testing/lecture_example.BIFXML')
     reasoner.maxing_out('Wet Grass?', 'Sprinkler?')
-    reasoner = BNReasoner('testing/lecture_example3.BIFXML')
-    reasoner.factor_mult('Visit to Asia?', 'Tuberculosis?')
+    # reasoner = BNReasoner('testing/lecture_example3.BIFXML')
+    # reasoner.factor_mult('Visit to Asia?', 'Tuberculosis?')
 
 
 if __name__ == '__main__':
