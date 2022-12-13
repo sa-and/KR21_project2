@@ -176,16 +176,14 @@ class BNReasoner:
         Independence: Given three sets of variables X, Y, and Z, determine whether X
         is independent of Y given Z. (Hint: Remember the connection between d-separation 
         and independence) (1.5pts)
-
-        TODO: Upate that it also checks other independencies
         """
         return self.dsep(X, Y, Z)
     
-    def _compute_new_cpt(self, factor, x, which):
+    def _compute_new_cpt(self, factor_table, x, which):
         """
         Given a factor and a variable X, compute the CPT in which X is either summed-out or maxed-out. (3pts)
         """
-        factor_table = self.bn.get_cpt(factor)
+        # factor_table = self.bn.get_cpt(factor)
 
         f = pd.DataFrame(columns = factor_table.columns)
         f["p"]= []
@@ -229,26 +227,18 @@ class BNReasoner:
         """
         Given a factor and a variable X, compute the CPT in which X is summed-out. (3pts)
         """
-        return self._compute_new_cpt(factor, x, 'sum')
+        return self._compute_new_cpt(self.bn.get_cpt(factor), x, 'sum')
 
-    def maxing_out(self, factor, x):
+    def maxing_out(self, factor: str, x):
         """
         Given a factor and a variable X, compute the CPT in which X is maxed-out. Remember
         to also keep track of which instantiation of X led to the maximized value. (5pts)
         
         TODO: Keep track of which value of X this comes from
         """
-        return self._compute_new_cpt(factor, x, 'max')
+        return self._compute_new_cpt(self.bn.get_cpt(factor), x, 'max')
 
-    def factor_mult(self, factor_f, factor_g):
-        """
-        Given two factors f and g, compute the multiplied factor h=fg. (5pts)
-        """
-        factor_table_f = self.bn.get_cpt(factor_f)
-        factor_table_g = self.bn.get_cpt(factor_g)
-        print(factor_table_f)
-        print(factor_table_g)
-        
+    def _mult_as_factor(self, factor_table_f, factor_table_g):
         X = pd.DataFrame(columns = factor_table_f.columns)
         Y = pd.DataFrame(columns = factor_table_g.columns)
         
@@ -279,28 +269,67 @@ class BNReasoner:
             value = comp_inst_f.p.values[0] * comp_inst_g.p.values[0]
             
             Z.at[i,'p'] = value 
-        print(Z)
+        # print(Z)
         return Z
+
+
+    def factor_mult(self, factor_f, factor_g):
+        """
+        Given two factors f and g, compute the multiplied factor h=fg. (5pts)
+        """
+        factor_table_f = self.bn.get_cpt(factor_f)
+        factor_table_g = self.bn.get_cpt(factor_g)
+        return self._mult_as_factor(factor_table_f, factor_table_g)
+        
+
+    def eliminate_var(self, x: str) -> pd.DataFrame:
+        """
+        Helper method to eliminate a variable from the BN
+        """
+        d_factors = self.bn.get_children(x)
+        cpt = self.bn.get_cpt(x)
+
+        for child in d_factors: # multiply all factors containing x
+            child_cpt = self.bn.get_cpt(child)
+            cpt = self._mult_as_factor(cpt, child_cpt)
+        
+        # marginalize out x
+        cpt = self._compute_new_cpt(cpt, x, 'sum')
+        return cpt
 
     def variable_elimination(self, X: set[str], elim_method: Union[Literal['min_fill'], Literal['min_degree']]):
         """
         Variable Elimination: Sum out a set of variables by using variable elimination.
         (5pts)
 
-        set X contains all the variables to eliminate.
+        set X contains all the variables to not eliminate.
 
         Following https://ermongroup.github.io/cs228-notes/inference/ve/
         """
-        # to_eliminate = set(self.bn.get_all_variables()) - X
+        to_eliminate = set(self.bn.get_all_variables()) - X
         if elim_method == 'min_degree':
-            elim_order = self.min_degree_ordering(X)
+            elim_order = self.min_degree_ordering(to_eliminate)
         elif elim_method == 'min_fill':
-            elim_order = self.get_minfill_orering(X)
+            elim_order = self.get_minfill_orering(to_eliminate)
         else:
             raise ValueError(f'elim_method {elim_method} not supported')
         for var in elim_order:
-            children = self.bn.get_children(var)
+            cpt = self.eliminate_var(var)
+            # children = self.bn.get_children(var)
+            # if len(children) == 0:
+            #     pass
+            #     # factor_cpt = self.bn.get_cpt(var)
+            # elif len(children) == 1:
+            #     factor_cpt = self.bn.get_cpt(children[0])
+            # else:
+            #     factor_cpt = self.factor_mult(children[0], children[1])
+            #     factor_name = f'f_{var}'
+            #     self.bn.add_var((factor_name, factor_cpt))
+            #     for new_child in children[2:]:
+            #         factor_cpt = self.factor_mult(new_child, factor_name)
+            #         self.bn.update_cpt(factor_cpt)
 
+            
 
 
     def min_degree_ordering(self, X):
