@@ -1,6 +1,4 @@
 import pandas as pd
-from functools import partial
-from typing import List, Tuple
 from typing import Union, Literal
 from BayesNet import BayesNet
 import itertools 
@@ -54,30 +52,6 @@ class BNReasoner:
         return rents
 
     @staticmethod
-    def ancestors(bn: BayesNet, x: str) -> set[str]:
-        ancs = set()
-        all_vars = set(bn.get_all_variables())
-        for var in all_vars - {x}:
-            if BNReasoner.has_path(var, {x}):
-                ancs.add(var)
-        return ancs
-
-    @staticmethod
-    def has_path(bn: BayesNet, x: str, Y: set[str]) -> bool:
-        """
-        Determines whether there is a path from x to any element in Y.
-        Simple BFS
-        """
-        visited = [x]
-        while len(visited) > 0:
-            node = visited.pop(0)
-            children = bn.get_children(node)
-            if any(y in children for y in Y):
-                return True
-            visited.extend(children)
-        return False
-
-    @staticmethod
     def disconnected(bn: BayesNet, X: set[str], Y: set[str]) -> bool:
         for x in X:
             if BNReasoner.has_undirected_path(bn, x, Y):
@@ -99,17 +73,6 @@ class BNReasoner:
     def num_deps(self, x):
         return len(self.bn.get_cpt(x).columns)-2
 
-    def _get_default_ordering(self, deps):
-        return deps
-
-    def get_ordered(self, deps):
-        """
-        This can call any number of heuristics-based implementations that
-        order the dependencies of a variable in a particular order. For now
-        it just returns the same ordering as given.
-        """
-        return self._get_default_ordering(deps)
-
     def _pr(self, x: str):
         """
         Computes probability of x Pr(x) in graph by marginalizing on 
@@ -120,7 +83,6 @@ class BNReasoner:
         if len(deps) == 0:
             return cpt[cpt[x] == True].p.values[0]
         cpt = cpt.copy()
-        deps = self.get_ordered(deps)
         for dep in deps:
             pr_dep = self._pr(dep)
             cpt = BNReasoner.marginalize_pr(cpt, dep, pr_dep)
@@ -261,10 +223,11 @@ class BNReasoner:
 
             comp_inst_f = self.bn.get_compatible_instantiations_table(f_series, factor_table_f)
             comp_inst_g = self.bn.get_compatible_instantiations_table(g_series, factor_table_g)
+
             value = comp_inst_f.p.values[0] * comp_inst_g.p.values[0]
             
             Z.at[i,'p'] = value 
-        # print(Z)
+
         return Z
 
 
@@ -324,7 +287,8 @@ class BNReasoner:
                 for gc in gcs:
                     self.bn.add_edge((fname, gc))
             for parent in parents:
-                self.bn.add_edge((parent, fname))
+                if parent != fname:
+                    self.bn.add_edge((parent, fname))
             self.bn.del_var(nname)
         # At the end of variable elimination, we should factor-multiply all variables together to give
         # a complete joint distribution
@@ -433,8 +397,10 @@ class BNReasoner:
         """Compute the maximum a-posteriory instantiation + value of query variables Q, given a possibly empty evidence e. (3pts)"""
         vars_to_keep = Q.union(set(e.index))
         jptd = self.variable_elimination(vars_to_keep, 'min_degree')
-        jptd = BayesNet.reduce_factor(e, jptd)
+        jptd = BayesNet.get_compatible_instantiations_table(e, jptd)
         row = jptd.iloc[pd.to_numeric(jptd.p).idxmax()]
+        for i in e.index:
+            del row[i]
         del row['p']
         return row
 
@@ -486,7 +452,7 @@ def test_dsep():
 
 def main():
     reasoner = BNReasoner('testing/lecture_example3.BIFXML')
-    e = pd.Series({'Smoker?': True, 'Bronchitis?': False})
+    e = pd.Series()
     Q = {'Lung Cancer?', 'Dyspnoea?', 'Positive X-Ray?'}
     # jptd = reasoner.variable_elimination(set(['Smoker?', 'Tuberculosis?']), 'min_degree')
     print(reasoner.map(Q, e))
