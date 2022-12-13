@@ -5,7 +5,6 @@ import itertools
 import networkx as nx
 from copy import deepcopy
 
-
 class BNReasoner:
     def __init__(self, net: Union[str, BayesNet]):
         """
@@ -224,7 +223,7 @@ class BNReasoner:
             comp_inst_f = self.bn.get_compatible_instantiations_table(f_series, factor_table_f)
             comp_inst_g = self.bn.get_compatible_instantiations_table(g_series, factor_table_g)
 
-            value = comp_inst_f.p.values[0] * comp_inst_g.p.values[0]
+            value = comp_inst_f.p.sum() * comp_inst_g.p.sum()
             
             Z.at[i,'p'] = value 
 
@@ -272,24 +271,27 @@ class BNReasoner:
         to_eliminate = self._get_elim_order(to_eliminate, elim_method)
         for var in to_eliminate:
             nname = self.get_node_or_factor_name(var)
-            parents = self.parents(self.bn, nname)
-            jmpt = self._eliminate_factor_or_variable(var, nname)
-            if jmpt is None:
+            while nname is not None:
+                breakpoint()
+                parents = self.parents(self.bn, nname)
+                jmpt = self._eliminate_factor_or_variable(var, nname)
+                if jmpt is None:
+                    self.bn.del_var(nname)
+                    continue
+                fname = self.get_factor_name(jmpt)
+                self.bn.add_var(fname, jmpt)
+                children = self.bn.get_children(nname)
+                for child in children:
+                    parents = parents.union(self.parents(self.bn, child))
+                    gcs = self.bn.get_children(child)
+                    self.bn.del_var(child)
+                    for gc in gcs:
+                        self.bn.add_edge((fname, gc))
+                for parent in parents - {fname, nname}:
+                    if parent != fname:
+                        self.bn.add_edge((parent, fname))
                 self.bn.del_var(nname)
-                continue
-            fname = self.get_factor_name(jmpt)
-            self.bn.add_var(fname, jmpt)
-            children = self.bn.get_children(nname)
-            for child in children:
-                parents = parents.union(self.parents(self.bn, child))
-                gcs = self.bn.get_children(child)
-                self.bn.del_var(child)
-                for gc in gcs:
-                    self.bn.add_edge((fname, gc))
-            for parent in parents:
-                if parent != fname:
-                    self.bn.add_edge((parent, fname))
-            self.bn.del_var(nname)
+                nname = self.get_node_or_factor_name(var)
         # At the end of variable elimination, we should factor-multiply all variables together to give
         # a complete joint distribution
         all_vars = self.bn.get_all_variables()
@@ -312,9 +314,11 @@ class BNReasoner:
             return norf
         factor_names = [v for v in all_vars if v.startswith('f_') and (f'_{norf}' in v or f',{norf}' in v)]
         if len(factor_names) == 0:
-            raise ValueError(f"Cannot eliminate variable {norf}: Already eliminated")
-        elif len(factor_names) > 1:
-            raise ValueError(f"Cannot eliminate variable {norf}: Found in multiple factors")
+            return None
+            # raise ValueError(f"Cannot eliminate variable {norf}: Already eliminated")
+        # elif len(factor_names) > 1:
+        #     breakpoint()
+        #     raise ValueError(f"Cannot eliminate variable {norf}: Found in multiple factors: {factor_names}")
         return factor_names[0]
 
     def min_degree_ordering(self, X):
@@ -396,9 +400,11 @@ class BNReasoner:
     def map(self, Q: set[str], e: pd.Series):
         """Compute the maximum a-posteriory instantiation + value of query variables Q, given a possibly empty evidence e. (3pts)"""
         vars_to_keep = Q.union(set(e.index))
+        self.prune(Q, e)
+        breakpoint()
         jptd = self.variable_elimination(vars_to_keep, 'min_degree')
         jptd = BayesNet.get_compatible_instantiations_table(e, jptd)
-        row = jptd.iloc[pd.to_numeric(jptd.p).idxmax()]
+        row = jptd.loc[pd.to_numeric(jptd.p).idxmax()]
         for i in e.index:
             del row[i]
         del row['p']
@@ -452,7 +458,7 @@ def test_dsep():
 
 def main():
     reasoner = BNReasoner('testing/lecture_example3.BIFXML')
-    e = pd.Series()
+    e = pd.Series({'Smoker?': True})
     Q = {'Lung Cancer?', 'Dyspnoea?', 'Positive X-Ray?'}
     # jptd = reasoner.variable_elimination(set(['Smoker?', 'Tuberculosis?']), 'min_degree')
     print(reasoner.map(Q, e))
