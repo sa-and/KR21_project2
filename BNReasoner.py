@@ -25,6 +25,7 @@ def run():
 
     # Obtain children
     print(bn.get_all_cpts())
+    
 
     # for child in children:
     #     # Obtain child node
