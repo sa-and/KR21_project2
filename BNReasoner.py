@@ -275,25 +275,67 @@ class BNReasoner:
         factor_table_f = self.bn.get_cpt(factor_f)
         factor_table_g = self.bn.get_cpt(factor_g)
         return self._mult_as_factor(factor_table_f, factor_table_g)
-        
 
-    def eliminate_var(self, var: str) -> Tuple[pd.DataFrame, set[str]]:
-        """
-        Helper method to eliminate a variable from the BN. If variable x
-        is still in a cpt, then do normal VE with factor mult and marginalization.
-        If x is part of a factor, then simply marginalize and return factor
-        """
-        d_factors = set(self.bn.get_children(var))
-        if len(d_factors) == 0:
-            return None, None
-        cpt = self.bn.get_cpt(var)
-        for child in d_factors: # multiply all factors containing x
+    def eliminate_factor_or_variable(self, vorf: str, nname: str) -> pd.DataFrame:
+        d_factors = set(self.bn.get_children(nname))
+        if len(d_factors) == 0: # if no children, eliminate immediately
+            return None
+        cpt = self.bn.get_cpt(nname)
+        for child in d_factors:
             child_cpt = self.bn.get_cpt(child)
             cpt = self._mult_as_factor(cpt, child_cpt)
         
-        # marginalize out x
-        cpt = self._compute_new_cpt(cpt, var, 'sum')
-        return cpt, d_factors
+        cpt = self._compute_new_cpt(cpt, vorf, 'sum')
+        return cpt
+
+    def get_elim_order(self, vars, elim_method):
+        if elim_method == 'min_degree':
+            return self.min_degree_ordering(vars)
+        elif elim_method == 'min_fill':
+            return self.minfill_ordering(vars)
+        else:
+            raise ValueError(f'elim_method {elim_method} not supported')
+
+    def variable_elimination(self, X: set[str], elim_method: Union[Literal['min_fill'], Literal['min_degree']]):
+        """
+        Variable Elimination: Sum out a set of variables by using variable elimination.
+        (5pts)
+
+        set X contains all the variables to not eliminate.
+
+        Following https://ermongroup.github.io/cs228-notes/inference/ve/
+        """
+        to_eliminate = set(self.bn.get_all_variables()) - X
+        to_eliminate = self.get_elim_order(to_eliminate, elim_method)
+        for var in to_eliminate:
+            nname = self.get_node_or_factor_name(var)
+            parents = self.parents(self.bn, nname)
+            jmpt = self.eliminate_factor_or_variable(var, nname)
+            if jmpt is None:
+                self.bn.del_var(nname)
+                continue
+            fname = self.get_factor_name(jmpt)
+            self.bn.add_var(fname, jmpt)
+            children = self.bn.get_children(nname)
+            for child in children:
+                parents = parents.union(self.parents(self.bn, child))
+                gcs = self.bn.get_children(child)
+                self.bn.del_var(child)
+                for gc in gcs:
+                    self.bn.add_edge((fname, gc))
+            for parent in parents:
+                self.bn.add_edge((parent, fname))
+            self.bn.del_var(nname)
+        # At the end of variable elimination, we should factor-multiply all variables together to give
+        # a complete joint distribution
+        all_vars = self.bn.get_all_variables()
+        if len(all_vars) == 0:
+            return pd.DataFrame()
+        cpt = self.bn.get_cpt(all_vars[0])
+        for v in all_vars[1:]:
+            cpt2 = self.bn.get_cpt(v)
+            cpt = self._mult_as_factor(cpt, cpt2)
+        return cpt
 
     @staticmethod
     def get_factor_name(cpt: pd.DataFrame):
@@ -310,48 +352,6 @@ class BNReasoner:
         elif len(factor_names) > 1:
             raise ValueError(f"Cannot eliminate variable {norf}: Found in multiple factors")
         return factor_names[0]
-
-    def variable_elimination(self, X: set[str], elim_method: Union[Literal['min_fill'], Literal['min_degree']]):
-        """
-        Variable Elimination: Sum out a set of variables by using variable elimination.
-        (5pts)
-
-        set X contains all the variables to not eliminate.
-
-        Following https://ermongroup.github.io/cs228-notes/inference/ve/
-        """
-        to_eliminate = set(self.bn.get_all_variables()) - X
-        if elim_method == 'min_degree':
-            elim_order = self.min_degree_ordering(to_eliminate)
-        elif elim_method == 'min_fill':
-            elim_order = self.minfill_ordering(to_eliminate)
-        else:
-            raise ValueError(f'elim_method {elim_method} not supported')
-        for var in elim_order:
-            nname = self.get_node_or_factor_name(var)
-            if nname.startswith('f_'): # Just marginalize factor on var
-                breakpoint()
-                cpt = self._compute_new_cpt(self.bn.get_cpt(nname), var, 'sum')
-                children = self.bn.get_children(nname)
-                self.bn.del_var(nname)
-                fname = BNReasoner.get_factor_name(cpt)
-                self.bn.add_var(fname, cpt)
-                for child in children: # reduction
-                    self.bn.add_edge((fname, child))
-                continue
-            # Do actual variable elimination
-            cpt, children = self.eliminate_var(var) # Get table with var eliminated
-            self.bn.del_var(nname) # remove node from graph
-            if cpt is None:
-                continue
-            fname = BNReasoner.get_factor_name(cpt)
-            self.bn.add_var(fname, cpt) # add factor to graph
-
-            for child in children: # add all children of var as children of reduced factor
-                grand_chldren = self.bn.get_children(child)
-                self.bn.del_var(child)
-                for gc in grand_chldren:
-                    self.bn.add_edge((fname, gc))
 
     def min_degree_ordering(self, X):
         """Given a set of variables X in the Bayesian network, 
@@ -476,8 +476,11 @@ def test_dsep():
 
 def main():
     # test_dsep()
-    reasoner = BNReasoner('testing/lecture_example.BIFXML')
-    reasoner.maxing_out('Wet Grass?', 'Sprinkler?')
+    reasoner = BNReasoner('testing/lecture_example3.BIFXML')
+    jptd = reasoner.variable_elimination(set(['Smoker?', 'Tuberculosis?']), 'min_degree')
+    print(jptd)
+    breakpoint()
+    # reasoner.maxing_out('Wet Grass?', 'Sprinkler?')
     # reasoner = BNReasoner('testing/lecture_example3.BIFXML')
     # reasoner.factor_mult('Visit to Asia?', 'Tuberculosis?')
 
