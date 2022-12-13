@@ -21,24 +21,25 @@ class BNReasoner:
 def run():
     # bayesnet = BNReasoner("testing/lecture_example.BIFXML") 
     bn = BayesNet()
-    bn.load_from_bifxml("testing/lecture_example.BIFXML")
+    bn.load_from_bifxml("testing/usecase.BIFXML")
 
     # Obtain children
-    children = bn.get_children('Rain?')
+    print(bn.get_all_cpts())
+    
 
-    for child in children:
-        # Obtain child node
-        cpt = bn.get_cpt(child)
+    # for child in children:
+    #     # Obtain child node
+    #     cpt = bn.get_cpt(child)
 
-        # Delete edge
-        bn.del_edge(('Rain?',child))
+    #     # Delete edge
+    #     bn.del_edge(('Rain?',child))
 
-        # Get new CPT, given the evidence
-        new_cpt = bn.get_compatible_instantiations_table(pd.Series({'Rain?': False}),cpt)
+    #     # Get new CPT, given the evidence
+    #     new_cpt = bn.get_compatible_instantiations_table(pd.Series({'Rain?': False}),cpt)
 
-        # Delete the column with evidence
+    #     # Delete the column with evidence
 
-        print(new_cpt)
+    #     print(new_cpt)
     
 
 
