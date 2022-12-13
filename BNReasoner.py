@@ -433,8 +433,6 @@ class BNReasoner:
         """Compute the maximum a-posteriory instantiation + value of query variables Q, given a possibly empty evidence e. (3pts)"""
         vars_to_keep = Q.union(set(e.index))
         jptd = self.variable_elimination(vars_to_keep, 'min_degree')
-
-        breakpoint()
         jptd = BayesNet.reduce_factor(e, jptd)
         row = jptd.iloc[pd.to_numeric(jptd.p).idxmax()]
         del row['p']
