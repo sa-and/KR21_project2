@@ -1,6 +1,6 @@
 import pandas as pd
 from functools import partial
-from typing import List
+from typing import List, Tuple
 from typing import Union, Literal
 from BayesNet import BayesNet
 import itertools 
@@ -183,9 +183,8 @@ class BNReasoner:
         """
         Given a factor and a variable X, compute the CPT in which X is either summed-out or maxed-out. (3pts)
         """
-        # factor_table = self.bn.get_cpt(factor)
-
-        f = pd.DataFrame(columns = factor_table.columns)
+        cols = [*[c for c in factor_table.columns if c != 'p'], 'p']
+        f = pd.DataFrame(columns = cols)
         f["p"]= []
         del f[x]
         if which == "max":
@@ -194,7 +193,7 @@ class BNReasoner:
         l = [False, True]
         instantiations = [list(i) for i in itertools.product(l, repeat = len(factor_table.columns) - 2)]
 
-        Y = factor_table.columns
+        Y = cols[:-1]
         count = 0
 
         for inst in instantiations:
@@ -204,12 +203,10 @@ class BNReasoner:
                 inst_dict[Y[j]] = inst[j]
                 inst_list.append(inst[j])
             inst_series = pd.Series(inst_dict)
-            comp_inst = self.bn.get_compatible_instantiations_table(inst_series, self.bn.get_cpt(factor))
-            print(comp_inst)
+            comp_inst = self.bn.get_compatible_instantiations_table(inst_series, factor_table)
             if which == 'max':
                 new_p = comp_inst.p.max()  
                 instantiation = comp_inst.loc[comp_inst["p"] == new_p][x].values[0]
-                print(instantiation)
                 inst_list.append(new_p)
                 inst_list.append(instantiation)
             elif which == 'sum':  
@@ -219,8 +216,6 @@ class BNReasoner:
             f.loc[count] = inst_list
 
             count += 1 
-        print(f)
-
         return f
 
     def marginalize(self, factor, x):
@@ -264,8 +259,8 @@ class BNReasoner:
             f_series = pd.Series(f)
             g_series = pd.Series(g)
 
-            comp_inst_f = self.bn.get_compatible_instantiations_table(f_series, self.bn.get_cpt(factor_f))
-            comp_inst_g = self.bn.get_compatible_instantiations_table(g_series, self.bn.get_cpt(factor_g))
+            comp_inst_f = self.bn.get_compatible_instantiations_table(f_series, factor_table_f)
+            comp_inst_g = self.bn.get_compatible_instantiations_table(g_series, factor_table_g)
             value = comp_inst_f.p.values[0] * comp_inst_g.p.values[0]
             
             Z.at[i,'p'] = value 
@@ -282,20 +277,39 @@ class BNReasoner:
         return self._mult_as_factor(factor_table_f, factor_table_g)
         
 
-    def eliminate_var(self, x: str) -> pd.DataFrame:
+    def eliminate_var(self, var: str) -> Tuple[pd.DataFrame, set[str]]:
         """
-        Helper method to eliminate a variable from the BN
+        Helper method to eliminate a variable from the BN. If variable x
+        is still in a cpt, then do normal VE with factor mult and marginalization.
+        If x is part of a factor, then simply marginalize and return factor
         """
-        d_factors = self.bn.get_children(x)
-        cpt = self.bn.get_cpt(x)
-
+        d_factors = set(self.bn.get_children(var))
+        if len(d_factors) == 0:
+            return None, None
+        cpt = self.bn.get_cpt(var)
         for child in d_factors: # multiply all factors containing x
             child_cpt = self.bn.get_cpt(child)
             cpt = self._mult_as_factor(cpt, child_cpt)
         
         # marginalize out x
-        cpt = self._compute_new_cpt(cpt, x, 'sum')
-        return cpt
+        cpt = self._compute_new_cpt(cpt, var, 'sum')
+        return cpt, d_factors
+
+    @staticmethod
+    def get_factor_name(cpt: pd.DataFrame):
+        cols = sorted([c for c in cpt.columns if c != 'p'])
+        return 'f_'+','.join(cols)
+
+    def get_node_or_factor_name(self, norf: str):
+        all_vars = self.bn.get_all_variables()
+        if norf in all_vars:
+            return norf
+        factor_names = [v for v in all_vars if v.startswith('f_') and (f'_{norf}' in v or f',{norf}' in v)]
+        if len(factor_names) == 0:
+            raise ValueError(f"Cannot eliminate variable {norf}: Already eliminated")
+        elif len(factor_names) > 1:
+            raise ValueError(f"Cannot eliminate variable {norf}: Found in multiple factors")
+        return factor_names[0]
 
     def variable_elimination(self, X: set[str], elim_method: Union[Literal['min_fill'], Literal['min_degree']]):
         """
@@ -310,27 +324,34 @@ class BNReasoner:
         if elim_method == 'min_degree':
             elim_order = self.min_degree_ordering(to_eliminate)
         elif elim_method == 'min_fill':
-            elim_order = self.get_minfill_orering(to_eliminate)
+            elim_order = self.minfill_ordering(to_eliminate)
         else:
             raise ValueError(f'elim_method {elim_method} not supported')
         for var in elim_order:
-            cpt = self.eliminate_var(var)
-            # children = self.bn.get_children(var)
-            # if len(children) == 0:
-            #     pass
-            #     # factor_cpt = self.bn.get_cpt(var)
-            # elif len(children) == 1:
-            #     factor_cpt = self.bn.get_cpt(children[0])
-            # else:
-            #     factor_cpt = self.factor_mult(children[0], children[1])
-            #     factor_name = f'f_{var}'
-            #     self.bn.add_var((factor_name, factor_cpt))
-            #     for new_child in children[2:]:
-            #         factor_cpt = self.factor_mult(new_child, factor_name)
-            #         self.bn.update_cpt(factor_cpt)
+            nname = self.get_node_or_factor_name(var)
+            if nname.startswith('f_'): # Just marginalize factor on var
+                breakpoint()
+                cpt = self._compute_new_cpt(self.bn.get_cpt(nname), var, 'sum')
+                children = self.bn.get_children(nname)
+                self.bn.del_var(nname)
+                fname = BNReasoner.get_factor_name(cpt)
+                self.bn.add_var(fname, cpt)
+                for child in children: # reduction
+                    self.bn.add_edge((fname, child))
+                continue
+            # Do actual variable elimination
+            cpt, children = self.eliminate_var(var) # Get table with var eliminated
+            self.bn.del_var(nname) # remove node from graph
+            if cpt is None:
+                continue
+            fname = BNReasoner.get_factor_name(cpt)
+            self.bn.add_var(fname, cpt) # add factor to graph
 
-            
-
+            for child in children: # add all children of var as children of reduced factor
+                grand_chldren = self.bn.get_children(child)
+                self.bn.del_var(child)
+                for gc in grand_chldren:
+                    self.bn.add_edge((fname, gc))
 
     def min_degree_ordering(self, X):
         """Given a set of variables X in the Bayesian network, 
