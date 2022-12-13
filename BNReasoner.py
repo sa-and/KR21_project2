@@ -1,7 +1,7 @@
 import pandas as pd
 from functools import partial
 from typing import List
-from typing import Union
+from typing import Union, Literal
 from BayesNet import BayesNet
 import itertools 
 import networkx as nx
@@ -88,7 +88,7 @@ class BNReasoner:
         return True
 
     @staticmethod
-    def __prune_variable(cpt: pd.DataFrame, var, pr: float) -> pd.DataFrame:
+    def marginalize_pr(cpt: pd.DataFrame, var: str, pr: float) -> pd.DataFrame:
         cpt.loc[cpt[var] == True, 'p'] = cpt[cpt[var] == True].p.multiply(pr)
         cpt.loc[cpt[var] == False, 'p'] = cpt[cpt[var] == False].p.multiply(1-pr)
         all_other_vars = [col for col in cpt.columns if col not in [var, 'p']]
@@ -101,14 +101,6 @@ class BNReasoner:
 
     def _get_default_ordering(self, deps):
         return deps
-
-    def __get_minfill(self, graph: BayesNet, vars: set[str]):
-        graph.get_interaction_graph()
-        pass
-
-    def get_minfill_orering(self, vars):
-        bn_copy = deepcopy(self.bn)
-        self.__get_minfill(bn_copy, vars)
     
     def get_ordered(self, deps):
         """
@@ -131,7 +123,7 @@ class BNReasoner:
         deps = self.get_ordered(deps)
         for dep in deps:
             pr_dep = self._pr(dep)
-            cpt = BNReasoner.__prune_variable(cpt, dep, pr_dep)
+            cpt = BNReasoner.marginalize_pr(cpt, dep, pr_dep)
         return cpt[cpt[x] == True].p.values[0]
 
     def prune(self, Q: set[str], e: pd.Series):
@@ -221,11 +213,9 @@ class BNReasoner:
             inst_list.append(new_p)
             f.loc[count] = inst_list
 
-            count += 1 
+            count += 1
 
-        print(f)
-
-        return(f)
+        return f
 
     def marginalize(self, factor, x):
         """
@@ -259,10 +249,9 @@ class BNReasoner:
         l = [False, True]
         instantiations = [list(i) for i in itertools.product(l, repeat = len(Z.columns) - 1)]
 
-        inst_df = pd.DataFrame(instantiations, columns= Z.columns[:-1])
+        inst_df = pd.DataFrame(instantiations, columns=Z.columns[:-1])
 
         Z = Z.merge(inst_df, how='right')
-        
         
         for i in range(len(inst_df)):
             # for j in range(inst_df):
@@ -285,13 +274,26 @@ class BNReasoner:
         print(Z)
         return Z
 
-    def variable_elimination(self, X):
+    def variable_elimination(self, X: set[str], elim_method: Union[Literal['min_fill'], Literal['min_degree']]):
         """
         Variable Elimination: Sum out a set of variables by using variable elimination.
         (5pts)
 
-        set X contains all the variables to eliminate via summing out
+        set X contains all the variables to eliminate.
+
+        Following https://ermongroup.github.io/cs228-notes/inference/ve/
         """
+        # to_eliminate = set(self.bn.get_all_variables()) - X
+        if elim_method == 'min_degree':
+            elim_order = self.min_degree_ordering(X)
+        elif elim_method == 'min_fill':
+            elim_order = self.get_minfill_orering(X)
+        else:
+            raise ValueError(f'elim_method {elim_method} not supported')
+        for var in elim_order:
+            children = self.bn.get_children(var)
+
+
 
     def min_degree_ordering(self, X):
         """Given a set of variables X in the Bayesian network, 
@@ -420,17 +422,10 @@ def test_dsep():
 def main():
     test_dsep()
     reasoner = BNReasoner('testing/lecture_example.BIFXML')
-    # breakpoint()
     reasoner.maxing_out('Wet Grass?', 'Sprinkler?')
-    # reasoner.bn.draw_structure()
-    # print(reasoner._pr('Slippery Road?'))
-    # print(reasoner._pr('Rain?'))
-    # reasoner.prune(set(['Slippery Road?']), set(['Rain?']))
-    # breakpoint()
-    #reasoner.factor_mult("Wet Grass?", "Sprinkler?")
-    #reasoner.bn.draw_structure()
-    #reasoner.min_degree_ordering({"Wet Grass?", "Sprinkler?", "Slippery Road?", "Rain?", "Winter?"})
-    #print(reasoner.bn.get_all_cpts())
-    #reasoner.minfill_ordering({"Wet Grass?", "Sprinkler?", "Slippery Road?", "Rain?", "Winter?"})
+    reasoner = BNReasoner('testing/lecture_example3.BIFXML')
+    reasoner.factor_mult('Visit to Asia?', 'Tuberculosis?')
+
+
 if __name__ == '__main__':
     main()
