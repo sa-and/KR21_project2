@@ -153,7 +153,6 @@ class BNReasoner:
         order = []
         while len(degrees):
             node = degrees[0][0]
-            print(node)
 
             # connect neighbours with each other
             neighbours = list(graph.neighbors(node)) # get all the neighbours of the node, participating in order
@@ -271,7 +270,7 @@ class BNReasoner:
         # pprint(upd_cpts)
 
         # get all the variables that are not in Q or e
-        X = set(self.bn.get_all_variables()) - Q - set(e.keys())
+        X = set(self.bn.get_all_variables()) - set(Q) - set(e.keys())
 
         # get order of variables summation
         order = self.elimination_order(X, heuristic=heuristic)
@@ -298,7 +297,7 @@ class BNReasoner:
         p_e = p_e['p'][0]
 
         # divide joint probability on probability of evidence
-        p_Q_e['p'] = p_Q_e['p'].apply(lambda x: x/p_e['p'][0])
+        p_Q_e['p'] = p_Q_e['p'].apply(lambda x: x/p_e)
 
         return p_Q_e
 
