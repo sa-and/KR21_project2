@@ -144,27 +144,17 @@ class BNReasoner:
         """
         Given a factor and a variable X, compute the CPT in which X is either summed-out or maxed-out. (3pts)
         """
-        cols = [*[c for c in factor_table.columns if c != 'p'], 'p']
         columns = [col for col in factor_table.columns if col != 'p' and 'instantiation_' not in col and x != col]
         inst_columns = [col for col in factor_table.columns if col.startswith('instantiation_')]
         f = pd.DataFrame(columns = [*columns, 'p', *inst_columns])
-        # f["p"]= []
-        # del f[x]
         if which == "max":
             f[f"instantiation_{x}"] = []
         
-
-        
-        # l = [False, True]
-        # instantiations = [list(i) for i in itertools.product(l, repeat = (len(columns) - 1))]
         instantiations = factor_table.groupby(columns).sum().index.values
         if len(instantiations) == 0:
             return factor_table
         if type(instantiations[0]) != type(tuple()):
-            instantiations = list(map(lambda x: [x], instantiations))
-            # breakpoint()
-        print(instantiations)
-        
+            instantiations = list(map(lambda x: [x], instantiations))        
         count = 0
 
         for inst in instantiations:
@@ -187,10 +177,8 @@ class BNReasoner:
                 inst_list.append(new_p)
             
             f.loc[count] = inst_list
-            
 
             count += 1 
-        print(f)
         return f
 
     def marginalize(self, factor, x):
@@ -220,18 +208,8 @@ class BNReasoner:
         
         vars = [*columns_x, *columns_y]
         inst_cols = [*inst_columns_x, * inst_columns_y]
-
-        # Z = pd.merge(X,Y)
-
         l = [False, True]
         instantiations = [list(i) for i in itertools.product(l, repeat = len(vars))]
-        # instantiations = df.groupby().sum().index.values
-        # if type(instantiations[0]) != type(tuple()):
-        #     instantiations = list(map(lambda x: [x], instantiations))
-        
-        # inst_df = pd.DataFrame(instantiations, columns=Z.columns[:-1])
-
-        # Z = Z.merge(inst_df, how='right')
         
         for count, i in enumerate(instantiations):
             # for j in range(inst_df):
@@ -250,8 +228,6 @@ class BNReasoner:
             comp_inst_g = self.bn.get_compatible_instantiations_table(g_series, factor_table_g)
 
             value = comp_inst_f.p.sum() * comp_inst_g.p.sum()
-            
-            # Z.at[i,'p'] = value 
 
             row = []
             for n, var in enumerate(vars):
@@ -267,10 +243,7 @@ class BNReasoner:
             
             df.loc[count] = row
 
-
-
         return df
-
 
     def factor_mult(self, factor_f, factor_g):
         """
@@ -316,10 +289,7 @@ class BNReasoner:
         """
         Variable Elimination: Sum out a set of variables by using variable elimination.
         (5pts)
-
-        set X contains all the variables to not eliminate.
-
-        Following https://ermongroup.github.io/cs228-notes/inference/ve/
+        This does not return anything but leaves the BN in a pruned/factored state.
         """
         to_eliminate = set(self.bn.get_all_variables()) - X
         to_eliminate = self._get_elim_order(to_eliminate, elim_method)
@@ -330,7 +300,6 @@ class BNReasoner:
             for neighbor in neighbors:
                 self.bn.del_var(neighbor)
             self.bn.add_var(fname, cpt)
-        return cpt
 
     @staticmethod
     def _get_factor_name(cpt: pd.DataFrame):
@@ -350,7 +319,6 @@ class BNReasoner:
             order.append(Lowest_degree)
             interaction_graph = self.remove_node_interaction(Lowest_degree, interaction_graph)
             X.remove(Lowest_degree)
-        print(order)
         return order
     
     def remove_node_interaction(self, node, graph): 
@@ -373,7 +341,6 @@ class BNReasoner:
             order.append(lowest_fill)
             interaction_graph = self.remove_node_interaction(lowest_fill, interaction_graph)
             X.remove(lowest_fill)
-        print(order)
         return order
    
     def lowest_fill(self, graph, X):
@@ -417,7 +384,8 @@ class BNReasoner:
         the variables in the Bayesian network X with Q ⊂ X but can also be Q = X. (2.5pts)"""
         vars_to_keep = Q.union(set(e.index))
         self.prune(Q, e)
-        jptd = self.variable_elimination(vars_to_keep, elim_method)
+        self.variable_elimination(vars_to_keep, elim_method)
+        jptd = self.multiply_all_tables()
         return BayesNet.get_compatible_instantiations_table(e, jptd)
 
     def map(self, Q: set[str], e: pd.Series, ret_jptd=False, elim_method='min_degree'):
@@ -457,8 +425,6 @@ class BNReasoner:
         end_table = self.multiply_all_tables()
 
         # end_table = end_table.dropna()
-        print("col",end_table.columns)
-        print(end_table)
         return end_table
 
     def multiply_all_tables(self): 
