@@ -280,18 +280,6 @@ class BNReasoner:
         factor_table_g = self.bn.get_cpt(factor_g)
         return self._mult_as_factor(factor_table_f, factor_table_g)
 
-    def _eliminate_factor_or_variable(self, vorf: str, nname: str) -> pd.DataFrame:
-        d_factors = set(self.bn.get_children(nname))
-        if len(d_factors) == 0: # if no children, eliminate immediately
-            return None
-        cpt = self.bn.get_cpt(nname)
-        for child in d_factors:
-            child_cpt = self.bn.get_cpt(child)
-            cpt = self._mult_as_factor(cpt, child_cpt)
-        
-        cpt = self._compute_new_cpt(cpt, vorf, 'sum')
-        return cpt
-
     def _get_elim_order(self, vars, elim_method):
         if elim_method == 'min_degree':
             return self.min_degree_ordering(vars)
@@ -338,25 +326,16 @@ class BNReasoner:
         while len(to_eliminate) > 0:
             var = to_eliminate.pop(0)
             cpt, neighbors = self._reduce_variable(var)
-            fname = self.get_factor_name(cpt)
+            fname = self._get_factor_name(cpt)
             for neighbor in neighbors:
                 self.bn.del_var(neighbor)
             self.bn.add_var(fname, cpt)
         return cpt
 
     @staticmethod
-    def get_factor_name(cpt: pd.DataFrame):
+    def _get_factor_name(cpt: pd.DataFrame):
         cols = sorted([c for c in cpt.columns if c != 'p'])
         return 'f_'+','.join(cols)
-
-    def get_node_or_factor_name(self, norf: str):
-        all_vars = self.bn.get_all_variables()
-        if norf in all_vars:
-            return norf
-        factor_names = [v for v in all_vars if v.startswith('f_') and (f'_{norf}' in v or f',{norf}' in v)]
-        if len(factor_names) == 0:
-            return None
-        return factor_names[0]
 
     def min_degree_ordering(self, X):
         """Given a set of variables X in the Bayesian network, 
@@ -418,7 +397,6 @@ class BNReasoner:
                     added_count += 1   
         return added_count/2
        
-
     def nodes_connected(self,u,v,graph): 
         return u in graph.neighbors(v)    
 
@@ -432,16 +410,19 @@ class BNReasoner:
                 lowest_degree = value
                 name = i 
         return name 
-
-    def map(self, Q: set[str], e: pd.Series, ret_jptd=False, elim_method='min_degree'):
-        """Compute the maximum a-posteriory instantiation + value of query variables Q, given a possibly empty evidence e. (3pts)"""
+    
+    def marginal_distribution(self, Q, e, elim_method='min_degree'):
+        """Given query variables Q and possibly empty evidence e, 
+        compute the marginal distribution P(Q|e). Note that Q is a subset of 
+        the variables in the Bayesian network X with Q ⊂ X but can also be Q = X. (2.5pts)"""
         vars_to_keep = Q.union(set(e.index))
         self.prune(Q, e)
         jptd = self.variable_elimination(vars_to_keep, elim_method)
-        jptd = BayesNet.get_compatible_instantiations_table(e, jptd)
-        # for q in Q:
-        #     jptd = self._compute_new_cpt(jptd, q, which='max')
+        return BayesNet.get_compatible_instantiations_table(e, jptd)
 
+    def map(self, Q: set[str], e: pd.Series, ret_jptd=False, elim_method='min_degree'):
+        """Compute the maximum a-posteriory instantiation + value of query variables Q, given a possibly empty evidence e. (3pts)"""
+        jptd = self.marginal_distribution(Q, e, elim_method=elim_method)
         row = jptd.loc[pd.to_numeric(jptd.p).idxmax()]
         for i in e.index:
             del row[i]
@@ -490,26 +471,6 @@ class BNReasoner:
         return end_table
 
 
-    def marginal_distribution(self, Q, e):
-        """Given query variables Q and possibly empty evidence e, 
-        compute the marginal distribution P(Q|e). Note that Q is a subset of 
-        the variables in the Bayesian network X with Q ⊂ X but can also be Q = X. (2.5pts)"""
-        #Reduce all factors w.r.t. e
-        if not len(e)==0 :
-            reduce_tables = self.bn.reduce_factor(e)
-        else: 
-            tables = self.bn.get_all_cpts()
-         
-        # calculation of joint marginal 
-        #use variable elimination 
-
-        # joint marginal by chain rule
-        
-        #sum out Q, to calculate Pr(e) 
-
-        #Compute p(Q|e) = joint marginal/pr(e)
-
-
 def test_prune():
     reasoner = BNReasoner('testing/lecture_example.BIFXML')
     e = pd.Series({'Rain?': False})
@@ -525,6 +486,7 @@ def test_map():
     reasoner = BNReasoner('testing/lecture_example2.BIFXML')
     Q = {'I', 'J'}
     e = pd.Series({'O': True})
+    breakpoint()
     assignments, jpt = reasoner.map(Q, e, ret_jptd=True)
     assert assignments['I'] == True
     assert assignments['J'] == False
