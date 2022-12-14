@@ -48,7 +48,6 @@ class BNReasoner_:
             for value in children[key]:
                 BayesNet.del_edge(new_bn,(key,value))
                 if type(e) is dict:
-                #if not e.empty:
                     BayesNet.update_cpt(new_bn, value, BayesNet.get_compatible_instantiations_table(pd.Series(e), BayesNet.get_cpt(new_bn, value)))
         
         #Node Pruning
@@ -545,8 +544,8 @@ Marginalization = False
 MaxingOut = False
 MultiplyFactor = False #True
 Ordering = False #True
-Variable_Elimination = False #True
-Marginal_distribution = False #True
+Variable_Elimination = False#True
+Marginal_distribution = False#True
 Map = False#True
 Mpe = True
 
@@ -613,7 +612,7 @@ if Variable_Elimination:
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
     Set = ["Winter?", "Rain?", "Wet Grass?","Sprinkler?"]
     # print(Set)
-    Pr_set = bnreasoner.variable_elimination(bnreasoner.get_all_cpts(), to_sum_out_vars=Set, order = "minimum_degree_ordering")
+    Pr_set = bnreasoner.variable_elimination(bnreasoner.bn.get_all_cpts(), to_sum_out_vars=Set, order = "minimum_degree_ordering")
     print("---------")
     print(Pr_set)
 
@@ -652,6 +651,6 @@ if Map:
 if Mpe:
     #Returns only the assignments of the var that have been maxed out, want rest is irrelevant
     #Vaker runnen als je een random extra row heb
-    bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
-    evidence = {"Slippery Road?": True, "Wet Grass?": False}
+    bnreasoner = BNReasoner_("testing/usecase.BIFXML")
+    evidence = {"cirrhosis": True, "liver-biopsy": True}
     print(bnreasoner.mpe(evidence))
