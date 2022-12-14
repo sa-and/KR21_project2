@@ -149,19 +149,21 @@ class BNReasoner:
         f["p"]= []
         del f[x]
         if which == "max":
-            f["instantiation"] = []
+            f[f"instantiation_{x}"] = []
+
+        columns = [col for col in factor_table.columns if col != 'p' and 'instantiations_' not in col]
 
         l = [False, True]
-        instantiations = [list(i) for i in itertools.product(l, repeat = len(factor_table.columns) - 2)]
+        instantiations = [list(i) for i in itertools.product(l, repeat = len(columns))]
 
-        Y = cols[:-1]
+        
         count = 0
 
         for inst in instantiations:
             inst_dict = {}
             inst_list = []
-            for j in range((len(factor_table.columns) - 2)):
-                inst_dict[Y[j]] = inst[j]
+            for j in range(len(columns)):
+                inst_dict[columns[j]] = inst[j]
                 inst_list.append(inst[j])
             inst_series = pd.Series(inst_dict)
             comp_inst = self.bn.get_compatible_instantiations_table(inst_series, factor_table)
@@ -451,6 +453,41 @@ class BNReasoner:
             return row, jptd
         return row
 
+    def mpe(self, Q, e): 
+        #Start with edge pruning and note pruning 
+        #Get elimination order
+        #maximize out for order 
+        self.prune(Q,e)
+        order = self.min_degree_ordering(Q)
+        for var in order:
+            list_childeren = self.bn.get_children(var)
+            for child in list_childeren: 
+                multiply_table  = self.factor_mult(var, child)
+                self.bn.update_cpt(child, multiply_table)
+                table =  self.maxing_out(child, var)
+                self.bn.update_cpt(child, table)
+                
+            
+            if len(list_childeren) == 0: 
+                var_table = self.bn.get_cpt(var)
+                table = self.maxing_out(var, var)
+                self.bn.update_cpt(var,table)
+            else:
+                self.bn.del_var(var)
+
+        end_table = self.multiply_all_tables()
+
+        return end_table
+
+    def multiply_all_tables(self): 
+        all_tables = self.bn.get_all_cpts()
+        all_tables_list = list(all_tables.values())
+        end_table  = all_tables_list[0]
+        for i in range(1, len(all_tables_list)): 
+            end_table = self._mult_as_factor(end_table,  all_tables_list[i])
+
+        return end_table
+
 
     def marginal_distribution(self, Q, e):
         """Given query variables Q and possibly empty evidence e, 
@@ -514,11 +551,12 @@ def main():
     # test_map()
     reasoner = BNReasoner('testing/lecture_example3.BIFXML')
 
-    # e = pd.Series({'Smoker?': True})
+    e = pd.Series({'Smoker?': True})
     Q = {'Lung Cancer?', 'Dyspnoea?', 'Positive X-Ray?'}
     # # jptd = reasoner.variable_elimination(set(['Smoker?', 'Tuberculosis?']), 'min_degree')
     # print(reasoner.map(Q, e))
-    reasoner.ve_int(Q)
+    # reasoner.ve_int(Q)
+    reasoner.mpe(Q, e)
     breakpoint()
 
 if __name__ == '__main__':
