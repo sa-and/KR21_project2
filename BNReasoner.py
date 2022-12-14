@@ -258,6 +258,51 @@ class BNReasoner:
         else:
             raise ValueError(f'elim_method {elim_method} not supported')
 
+    def get_factors_using(self, var: str):
+        cpts = self.bn.get_all_cpts()
+        factors = set()
+        for f, cpt in cpts.items():
+            if var in cpt.columns:
+                factors.add(f)
+        return factors
+    
+    def elim_var_int(self, var: str):
+        """Once again trying to implement elim var"""
+        neighbors = self.get_factors_using(var)
+        if len(neighbors) == 0:
+            return None, None
+        cpt = None # self.bn.get_cpt(neighbors.pop())
+        for neighbor in neighbors: # Multiply all neighbors together in factor multiply
+            if cpt is None:
+                cpt = self.bn.get_cpt(neighbor)
+                continue
+            neighbor_cpt = self.bn.get_cpt(neighbor)
+            cpt = self._mult_as_factor(cpt, neighbor_cpt) 
+        cpt = self._compute_new_cpt(cpt, var, 'sum') # Sum out variable
+        return cpt, neighbors
+
+    def ve_int(self, X: set[str], elim_method: Union[Literal['min_fill'], Literal['min_degree']] = 'min_degree'):
+        """VE using interaction graph cuz I'm an idiot"""
+        """
+        Variable Elimination: Sum out a set of variables by using variable elimination.
+        (5pts)
+
+        set X contains all the variables to not eliminate.
+
+        Following https://ermongroup.github.io/cs228-notes/inference/ve/
+        """
+        to_eliminate = set(self.bn.get_all_variables()) - X
+        to_eliminate = self._get_elim_order(to_eliminate, elim_method)
+        while len(to_eliminate) > 0:
+            var = to_eliminate.pop(0)
+            print(f'eliminating {var}')
+            cpt, neighbors = self.elim_var_int(var)
+            fname = self.get_factor_name(cpt)
+            for neighbor in neighbors:
+                print('deleting ', neighbor)
+                self.bn.del_var(neighbor)
+            self.bn.add_var(fname, cpt)
+
     def variable_elimination(self, X: set[str], elim_method: Union[Literal['min_fill'], Literal['min_degree']]):
         """
         Variable Elimination: Sum out a set of variables by using variable elimination.
@@ -272,7 +317,6 @@ class BNReasoner:
         for var in to_eliminate:
             nname = self.get_node_or_factor_name(var)
             while nname is not None:
-                breakpoint()
                 parents = self.parents(self.bn, nname)
                 jmpt = self._eliminate_factor_or_variable(var, nname)
                 if jmpt is None:
@@ -315,10 +359,6 @@ class BNReasoner:
         factor_names = [v for v in all_vars if v.startswith('f_') and (f'_{norf}' in v or f',{norf}' in v)]
         if len(factor_names) == 0:
             return None
-            # raise ValueError(f"Cannot eliminate variable {norf}: Already eliminated")
-        # elif len(factor_names) > 1:
-        #     breakpoint()
-        #     raise ValueError(f"Cannot eliminate variable {norf}: Found in multiple factors: {factor_names}")
         return factor_names[0]
 
     def min_degree_ordering(self, X):
@@ -397,17 +437,18 @@ class BNReasoner:
                 name = i 
         return name 
 
-    def map(self, Q: set[str], e: pd.Series):
+    def map(self, Q: set[str], e: pd.Series, ret_jptd=False):
         """Compute the maximum a-posteriory instantiation + value of query variables Q, given a possibly empty evidence e. (3pts)"""
         vars_to_keep = Q.union(set(e.index))
         self.prune(Q, e)
-        breakpoint()
         jptd = self.variable_elimination(vars_to_keep, 'min_degree')
         jptd = BayesNet.get_compatible_instantiations_table(e, jptd)
         row = jptd.loc[pd.to_numeric(jptd.p).idxmax()]
         for i in e.index:
             del row[i]
         del row['p']
+        if ret_jptd:
+            return row, jptd
         return row
 
 
@@ -438,8 +479,22 @@ def test_prune():
     reasoner.prune(Q, e)
     assert 'Wet Grass?' not in reasoner.bn.get_all_variables()
     assert 'Slippery Road?' not in reasoner.bn.get_children('Rain?')
-    assert reasoner._pr('Slippery Road?') == 0.0
-    assert reasoner._pr('Winter?') == 0.6
+
+def test_map():
+    """
+    Test taken from PGM4_22.pdf page 20.
+    """
+    reasoner = BNReasoner('testing/lecture_example2.BIFXML')
+    Q = {'I', 'J'}
+    e = pd.Series({'O': True})
+    breakpoint()
+    assignments, jpt = reasoner.map(Q, e, ret_jptd=True)
+    assert assignments['I'] == True
+    assert assignments['J'] == False
+
+
+def test_variable_elimination():
+    reasoner = BNReasoner()
 
 
 def test_dsep():
@@ -453,15 +508,17 @@ def test_dsep():
     assert reasoner.dsep(set(['Positive X-Ray?', 'Smoker?']), set(['Dyspnoea?']), set(['Bronchitis?', 'Tuberculosis or Cancer?']))
     assert reasoner.dsep(set(['Positive X-Ray?']), set(['Smoker?']), set(['Lung Cancer?']))
     assert not reasoner.dsep(set(['Positive X-Ray?']), set(['Smoker?']), set(['Dyspnoea?', 'Lung Cancer?']))
-    breakpoint()
 
 
 def main():
+    # test_map()
     reasoner = BNReasoner('testing/lecture_example3.BIFXML')
-    e = pd.Series({'Smoker?': True})
+
+    # e = pd.Series({'Smoker?': True})
     Q = {'Lung Cancer?', 'Dyspnoea?', 'Positive X-Ray?'}
-    # jptd = reasoner.variable_elimination(set(['Smoker?', 'Tuberculosis?']), 'min_degree')
-    print(reasoner.map(Q, e))
+    # # jptd = reasoner.variable_elimination(set(['Smoker?', 'Tuberculosis?']), 'min_degree')
+    # print(reasoner.map(Q, e))
+    reasoner.ve_int(Q)
     breakpoint()
 
 if __name__ == '__main__':

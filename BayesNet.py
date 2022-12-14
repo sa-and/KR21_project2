@@ -6,7 +6,7 @@ import math
 import itertools
 import pandas as pd
 from copy import deepcopy
-
+import traceback
 
 class BayesNet:
 
@@ -94,7 +94,8 @@ class BayesNet:
         try:
             return self.structure.nodes[variable]['cpt']
         except KeyError:
-            raise Exception('Variable not in the BN')
+            traceback.print_stack()
+            raise Exception('Variable not in the BN: ' + variable)
 
     def get_all_variables(self) -> List[str]:
         """
