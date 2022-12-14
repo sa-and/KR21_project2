@@ -145,17 +145,25 @@ class BNReasoner:
         Given a factor and a variable X, compute the CPT in which X is either summed-out or maxed-out. (3pts)
         """
         cols = [*[c for c in factor_table.columns if c != 'p'], 'p']
-        f = pd.DataFrame(columns = cols)
-        f["p"]= []
-        del f[x]
+        columns = [col for col in factor_table.columns if col != 'p' and 'instantiation_' not in col and x != col]
+        inst_columns = [col for col in factor_table.columns if col.startswith('instantiation_')]
+        f = pd.DataFrame(columns = [*columns, 'p', *inst_columns])
+        # f["p"]= []
+        # del f[x]
         if which == "max":
             f[f"instantiation_{x}"] = []
+        
 
-        columns = [col for col in factor_table.columns if col != 'p' and 'instantiations_' not in col]
-
-        l = [False, True]
-        instantiations = [list(i) for i in itertools.product(l, repeat = len(columns))]
-
+        
+        # l = [False, True]
+        # instantiations = [list(i) for i in itertools.product(l, repeat = (len(columns) - 1))]
+        instantiations = factor_table.groupby(columns).sum().index.values
+        if len(instantiations) == 0:
+            return factor_table
+        if type(instantiations[0]) != type(tuple()):
+            instantiations = list(map(lambda x: [x], instantiations))
+            # breakpoint()
+        print(instantiations)
         
         count = 0
 
@@ -168,17 +176,21 @@ class BNReasoner:
             inst_series = pd.Series(inst_dict)
             comp_inst = self.bn.get_compatible_instantiations_table(inst_series, factor_table)
             if which == 'max':
-                new_p = comp_inst.p.max()  
-                instantiation = comp_inst.loc[comp_inst["p"] == new_p][x].values[0]
+                new_p = comp_inst.p.max()
+                row = comp_inst.loc[comp_inst["p"] == new_p]
                 inst_list.append(new_p)
-                inst_list.append(instantiation)
+                for inst_column in inst_columns:
+                    inst_list.append(row[inst_column].values[0])
+                inst_list.append(row[x].values[0])
             elif which == 'sum':  
                 new_p = comp_inst.p.sum()
                 inst_list.append(new_p)
             
             f.loc[count] = inst_list
+            
 
             count += 1 
+        print(f)
         return f
 
     def marginalize(self, factor, x):
@@ -192,32 +204,44 @@ class BNReasoner:
         Given a factor and a variable X, compute the CPT in which X is maxed-out. Remember
         to also keep track of which instantiation of X led to the maximized value. (5pts)
         
-        TODO: Keep track of which value of X this comes from
         """
         return self._compute_new_cpt(self.bn.get_cpt(factor), x, 'max')
 
     def _mult_as_factor(self, factor_table_f, factor_table_g):
         X = pd.DataFrame(columns = factor_table_f.columns)
         Y = pd.DataFrame(columns = factor_table_g.columns)
+
+        # cols = [*[c for c in factor_table.columns if c != 'p'], 'p']
+        columns_x = [col for col in X.columns if col != 'p' and 'instantiation_' not in col]
+        columns_y = [col for col in Y.columns if col != 'p' and 'instantiation_' not in col and col not in columns_x]
+        inst_columns_x = [col for col in X.columns if col.startswith('instantiation_')]
+        inst_columns_y = [col for col in Y.columns if col.startswith('instantiation_')]
+        df = pd.DataFrame(columns = [*columns_x, *columns_y, 'p', *inst_columns_x, *inst_columns_y])
         
-        Z = pd.merge(X,Y)
+        vars = [*columns_x, *columns_y]
+        inst_cols = [*inst_columns_x, * inst_columns_y]
+
+        # Z = pd.merge(X,Y)
 
         l = [False, True]
-        instantiations = [list(i) for i in itertools.product(l, repeat = len(Z.columns) - 1)]
-
-        inst_df = pd.DataFrame(instantiations, columns=Z.columns[:-1])
-
-        Z = Z.merge(inst_df, how='right')
+        instantiations = [list(i) for i in itertools.product(l, repeat = len(vars))]
+        # instantiations = df.groupby().sum().index.values
+        # if type(instantiations[0]) != type(tuple()):
+        #     instantiations = list(map(lambda x: [x], instantiations))
         
-        for i in range(len(inst_df)):
+        # inst_df = pd.DataFrame(instantiations, columns=Z.columns[:-1])
+
+        # Z = Z.merge(inst_df, how='right')
+        
+        for count, i in enumerate(instantiations):
             # for j in range(inst_df):
             f = {}
             g = {} 
-            for variable in inst_df.columns:
+            for n, variable in enumerate(vars):
                 if variable in factor_table_f.columns:
-                    f[variable] = inst_df[variable][i]
+                    f[variable] = i[n]
                 if variable in factor_table_g.columns:
-                    g[variable] = inst_df[variable][i]
+                    g[variable] = i[n]
             
             f_series = pd.Series(f)
             g_series = pd.Series(g)
@@ -227,9 +251,25 @@ class BNReasoner:
 
             value = comp_inst_f.p.sum() * comp_inst_g.p.sum()
             
-            Z.at[i,'p'] = value 
+            # Z.at[i,'p'] = value 
 
-        return Z
+            row = []
+            for n, var in enumerate(vars):
+                row.append(i[n])
+
+            row.append(value)
+
+            for inst in inst_cols:
+                if inst in comp_inst_f.columns:
+                    row.append(comp_inst_f.loc[:,inst].values[0])
+                else:
+                    row.append(comp_inst_g.loc[:,inst].values[0])
+            
+            df.loc[count] = row
+
+
+
+        return df
 
 
     def factor_mult(self, factor_f, factor_g):
@@ -415,7 +455,8 @@ class BNReasoner:
         #Get elimination order
         #maximize out for order 
         self.prune(Q,e)
-        order = self.min_degree_ordering(Q)
+        vars_to_keep = Q.union(set(e.index))
+        order = self.min_degree_ordering(set(self.bn.get_all_variables()) - vars_to_keep)
         for var in order:
             list_childeren = self.bn.get_children(var)
             for child in list_childeren: 
@@ -431,9 +472,12 @@ class BNReasoner:
                 self.bn.update_cpt(var,table)
             else:
                 self.bn.del_var(var)
-
+        breakpoint()
         end_table = self.multiply_all_tables()
 
+        # end_table = end_table.dropna()
+        print("col",end_table.columns)
+        print(end_table)
         return end_table
 
     def multiply_all_tables(self): 
@@ -504,24 +548,17 @@ def test_dsep():
 
 
 def main():
-    test_map()
-    # reasoner = BNReasoner('testing/lecture_example3.BIFXML')
+    # test_map()
+    reasoner = BNReasoner('testing/lecture_example3.BIFXML')
 
-<<<<<<< HEAD
     e = pd.Series({'Smoker?': True})
     Q = {'Lung Cancer?', 'Dyspnoea?', 'Positive X-Ray?'}
     # # jptd = reasoner.variable_elimination(set(['Smoker?', 'Tuberculosis?']), 'min_degree')
     # print(reasoner.map(Q, e))
     # reasoner.ve_int(Q)
     reasoner.mpe(Q, e)
+    # reasoner.maxing_out('Wet Grass?', 'Wet Grass?')
     breakpoint()
-=======
-    # e = pd.Series({'Smoker?': True})
-    # Q = {'Lung Cancer?', 'Dyspnoea?', 'Positive X-Ray?'}
-    # # jptd = reasoner.variable_elimination(set(['Smoker?', 'Tuberculosis?']), 'min_degree')
-    # print(reasoner.map(Q, e))
-    # reasoner.variable_elimination(Q)
->>>>>>> 25f62aa30c573a53b025ed4a5e1f178a89713c31
 
 if __name__ == '__main__':
     main()
