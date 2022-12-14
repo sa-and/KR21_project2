@@ -139,7 +139,7 @@ class BNReasoner_:
                      
         return True 
 
-    def marginalization(self,cpt, X):#bn,X):
+    def marginalization(self,cpt, X):
         '''
         Given a factor and a variable X, compute the CPT in which X is summed-out
         :param cpt: a factor
@@ -161,7 +161,7 @@ class BNReasoner_:
 
         return newcpt
 
-    def maxing_out(self,cpt,X):#cpt,X):
+    def maxing_out(self,cpt,X):
         '''
         Given a factor and a variable X, compute the CPT in which X is maxed-out
         :param cpt: a factor
@@ -170,14 +170,13 @@ class BNReasoner_:
         '''
         
         newcpt = deepcopy(cpt)
-
         remaining_vars = [x for x in newcpt.columns if x != X and x != 'p']
-
-        if len(list(newcpt.columns)) == 1:
-            p = newcpt["p"].max()
-            newcpt = pd.DataFrame({" ": ["T"], "p":[p]})
-        else:
-            newcpt = newcpt.loc[newcpt.groupby(remaining_vars)['p'].idxmax()]
+        
+        # if len(list(newcpt.columns)) == 1:
+        #     p = newcpt["p"].max()
+        #     newcpt = pd.DataFrame({" ": ["T"], "p":[p]})
+        # else:
+        newcpt = newcpt.loc[newcpt.groupby(remaining_vars)['p'].idxmax()]
 
         return newcpt
 
@@ -354,8 +353,7 @@ class BNReasoner_:
             if var not in to_sum_out_vars:
                 q.append(var)      
 
-        f = deepcopy(cpts)                  
-        # print(order, type(order))
+        f = deepcopy(cpts)           
         
         #If no order is assigned, the order in which the to sum out variables are given is used as ordering --> misschien random maken?
         if order is None:
@@ -381,10 +379,8 @@ class BNReasoner_:
                         done.append(var)
                         to_multiply.append(f[var])
 
-            if n is None:    
-                # x =list(to_multiply.keys())[0]         
+            if n is None:             
                 n = to_multiply[0]
-                # to_multiply.pop(x)
                 if len(to_multiply) > 1:
                     for factor in to_multiply[1:]:
                         n = self.multiply_factors(n, factor)
@@ -409,7 +405,6 @@ class BNReasoner_:
         for var in (cpts):
             if i == 0:
                 n = cpts[var]
-                #print(n)
                 i+=1
             else:
                 n = self.multiply_factors(n, cpts[var])
@@ -425,9 +420,7 @@ class BNReasoner_:
         :param e: a series of assignments as tuples, containing the evidence
         :returns: marginal distribution P(Q|e)
         '''
-        # e = evidence.keys()
-        # print(e)
-        # print(len(e))
+        
         to_sum_out = self.bn.get_all_variables()
         for var in Q:
             to_sum_out.remove(var) 
@@ -438,25 +431,15 @@ class BNReasoner_:
         else:
             cpt = self.bn.get_all_cpts()
             #reduce factors by evidence 
-            if len(e) != 0:
-                # print("e is working")
-                
+            if len(e) != 0:                
                 for var in cpt:
-                    # print("++++++++++++++")
-                    # print(cpt[var])
                     cpt[var] = BayesNet.get_compatible_instantiations_table(pd.Series(e), cpt[var])
-                    # print(cpt[var])
+                    
             # calculate the prior marginal of Q:
             cpt = self.variable_elimination(cpt, to_sum_out, order)
-            # print("----------cpt----------")
-            # print(cpt)
-            # print()
-
+            
             if len(e) != 0:  
                 Pr_e = cpt["p"].sum()
-                # print("-------Pr(e)--------------")
-                # print(Pr_e)
-                # print()
                 cpt['p'] = cpt['p']/Pr_e
                 #cpt is now the posterior marginal of Q
 
@@ -524,18 +507,20 @@ class BNReasoner_:
                 for factor in to_multiply:
                     n = self.multiply_factors(n, factor)             
             n = self.maxing_out(n, s)
+       
+        n[" "] = 'T'
+        p = n["p"].max()
         
-        m = deepcopy(n)
-        m[" "] = 'T'
+        n = n[n['p'] == p]
         
         list_order_cpt = list()
-        for item in list(m.columns):
+        for item in list(n.columns):
             if item == 'p':
                 list_order_cpt = [' ', 'p'] + list_order_cpt
             elif item != ' ':
                 list_order_cpt.append(item)
-        m = m[list_order_cpt]
-        return m   
+        n = n[list_order_cpt]
+        return n  
 
 Pruning = False
 check_d_separation = False #True
@@ -621,16 +606,6 @@ if Marginal_distribution:
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
     q = ["Winter?", "Rain?"]
     evidence = {"Sprinkler?":True}
-    # ev = list()
-    # if len(evidence) != 0:
-    #     for k in evidence:
-    #         ev.append(k)
-    #     e = pd.Series(data= evidence, index = ev)   
-    # else:
-    #     e = {}
-    #     # e = pd.Series(data= evidence, index = ev)   
-    #     # print(e)
-    # #print(q, e)
     
     print("Pr(Q,e)")
     print(bnreasoner.marginal_distribution(q,evidence))
@@ -652,5 +627,5 @@ if Mpe:
     #Returns only the assignments of the var that have been maxed out, want rest is irrelevant
     #Vaker runnen als je een random extra row heb
     bnreasoner = BNReasoner_("testing/usecase.BIFXML")
-    evidence = {"cirrhosis": True, "liver-biopsy": True}
-    print(bnreasoner.mpe(evidence))
+    evidence = {"cirrhosis": True, "liver-biopsy": True, "liver-cancer": False}
+    print(bnreasoner.mpe(evidence, "minimum_degree_ordering"))
