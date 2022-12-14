@@ -216,11 +216,12 @@ class BNReasoner:
             f = {}
             g = {} 
             for n, variable in enumerate(vars):
+                if type(i[n]) == type([]):
+                    breakpoint()
                 if variable in factor_table_f.columns:
                     f[variable] = i[n]
                 if variable in factor_table_g.columns:
                     g[variable] = i[n]
-            
             f_series = pd.Series(f)
             g_series = pd.Series(g)
 
