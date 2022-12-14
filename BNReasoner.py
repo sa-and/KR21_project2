@@ -266,12 +266,12 @@ class BNReasoner:
                 factors.add(f)
         return factors
     
-    def elim_var_int(self, var: str):
+    def _reduce_variable(self, var: str):
         """Once again trying to implement elim var"""
         neighbors = self.get_factors_using(var)
         if len(neighbors) == 0:
             return None, None
-        cpt = None # self.bn.get_cpt(neighbors.pop())
+        cpt = None 
         for neighbor in neighbors: # Multiply all neighbors together in factor multiply
             if cpt is None:
                 cpt = self.bn.get_cpt(neighbor)
@@ -279,10 +279,10 @@ class BNReasoner:
             neighbor_cpt = self.bn.get_cpt(neighbor)
             cpt = self._mult_as_factor(cpt, neighbor_cpt) 
         cpt = self._compute_new_cpt(cpt, var, 'sum') # Sum out variable
+        cpt.p /= cpt.p.sum() # normalize for joint probability
         return cpt, neighbors
 
-    def ve_int(self, X: set[str], elim_method: Union[Literal['min_fill'], Literal['min_degree']] = 'min_degree'):
-        """VE using interaction graph cuz I'm an idiot"""
+    def variable_elimination(self, X: set[str], elim_method: Union[Literal['min_fill'], Literal['min_degree']] = 'min_degree'):
         """
         Variable Elimination: Sum out a set of variables by using variable elimination.
         (5pts)
@@ -295,56 +295,11 @@ class BNReasoner:
         to_eliminate = self._get_elim_order(to_eliminate, elim_method)
         while len(to_eliminate) > 0:
             var = to_eliminate.pop(0)
-            print(f'eliminating {var}')
-            cpt, neighbors = self.elim_var_int(var)
+            cpt, neighbors = self._reduce_variable(var)
             fname = self.get_factor_name(cpt)
             for neighbor in neighbors:
-                print('deleting ', neighbor)
                 self.bn.del_var(neighbor)
             self.bn.add_var(fname, cpt)
-
-    def variable_elimination(self, X: set[str], elim_method: Union[Literal['min_fill'], Literal['min_degree']]):
-        """
-        Variable Elimination: Sum out a set of variables by using variable elimination.
-        (5pts)
-
-        set X contains all the variables to not eliminate.
-
-        Following https://ermongroup.github.io/cs228-notes/inference/ve/
-        """
-        to_eliminate = set(self.bn.get_all_variables()) - X
-        to_eliminate = self._get_elim_order(to_eliminate, elim_method)
-        for var in to_eliminate:
-            nname = self.get_node_or_factor_name(var)
-            while nname is not None:
-                parents = self.parents(self.bn, nname)
-                jmpt = self._eliminate_factor_or_variable(var, nname)
-                if jmpt is None:
-                    self.bn.del_var(nname)
-                    continue
-                fname = self.get_factor_name(jmpt)
-                self.bn.add_var(fname, jmpt)
-                children = self.bn.get_children(nname)
-                for child in children:
-                    parents = parents.union(self.parents(self.bn, child))
-                    gcs = self.bn.get_children(child)
-                    self.bn.del_var(child)
-                    for gc in gcs:
-                        self.bn.add_edge((fname, gc))
-                for parent in parents - {fname, nname}:
-                    if parent != fname:
-                        self.bn.add_edge((parent, fname))
-                self.bn.del_var(nname)
-                nname = self.get_node_or_factor_name(var)
-        # At the end of variable elimination, we should factor-multiply all variables together to give
-        # a complete joint distribution
-        all_vars = self.bn.get_all_variables()
-        if len(all_vars) == 0:
-            return pd.DataFrame()
-        cpt = self.bn.get_cpt(all_vars[0])
-        for v in all_vars[1:]:
-            cpt2 = self.bn.get_cpt(v)
-            cpt = self._mult_as_factor(cpt, cpt2)
         return cpt
 
     @staticmethod
@@ -410,7 +365,6 @@ class BNReasoner:
                 name = var 
         return name
 
-    
     def amount_added_interaction(self, x, graph): 
         neighbours = [n for n in nx.neighbors(graph, x)]
         added_count = 0 
@@ -437,12 +391,15 @@ class BNReasoner:
                 name = i 
         return name 
 
-    def map(self, Q: set[str], e: pd.Series, ret_jptd=False):
+    def map(self, Q: set[str], e: pd.Series, ret_jptd=False, elim_method='min_degree'):
         """Compute the maximum a-posteriory instantiation + value of query variables Q, given a possibly empty evidence e. (3pts)"""
         vars_to_keep = Q.union(set(e.index))
         self.prune(Q, e)
-        jptd = self.variable_elimination(vars_to_keep, 'min_degree')
+        jptd = self.variable_elimination(vars_to_keep, elim_method)
         jptd = BayesNet.get_compatible_instantiations_table(e, jptd)
+        # for q in Q:
+        #     jptd = self._compute_new_cpt(jptd, q, which='max')
+
         row = jptd.loc[pd.to_numeric(jptd.p).idxmax()]
         for i in e.index:
             del row[i]
@@ -487,7 +444,6 @@ def test_map():
     reasoner = BNReasoner('testing/lecture_example2.BIFXML')
     Q = {'I', 'J'}
     e = pd.Series({'O': True})
-    breakpoint()
     assignments, jpt = reasoner.map(Q, e, ret_jptd=True)
     assert assignments['I'] == True
     assert assignments['J'] == False
@@ -511,15 +467,14 @@ def test_dsep():
 
 
 def main():
-    # test_map()
-    reasoner = BNReasoner('testing/lecture_example3.BIFXML')
+    test_map()
+    # reasoner = BNReasoner('testing/lecture_example3.BIFXML')
 
     # e = pd.Series({'Smoker?': True})
-    Q = {'Lung Cancer?', 'Dyspnoea?', 'Positive X-Ray?'}
+    # Q = {'Lung Cancer?', 'Dyspnoea?', 'Positive X-Ray?'}
     # # jptd = reasoner.variable_elimination(set(['Smoker?', 'Tuberculosis?']), 'min_degree')
     # print(reasoner.map(Q, e))
-    reasoner.ve_int(Q)
-    breakpoint()
+    # reasoner.variable_elimination(Q)
 
 if __name__ == '__main__':
     main()
