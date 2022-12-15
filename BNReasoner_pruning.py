@@ -22,14 +22,14 @@ class BNReasoner_:
     # print("hi")
     def Network_Pruning(self, Q, e):
         '''
-        :param bn: Bayesnetwork
-        :param Q: (query) set of variables, in case of d-separation the var of which you want to know whether they are d-separated
-        :param e: the set of evidence variables or when used to check whether X and Y are d-separation by Z, is this Z
-        :param evidence: a series of assignments as tuples. E.g.: pd.Series({"A": True, "B": False}), containing the assignments of the evidence. 
-                It is not obligated, therefor this function is usable for d-separation, without knowing the assignment of the Z
+        Given a set of query variables Q and evidence e, node- and edge-prunes the Bayesian network s.t. queries of the form P(Q|E) can
+            still be correctly calculated
+
+        :param Q: list of (query) variables; in case of d-separation it contains the variables of which you want to know whether they are d-separated
+        :param e: the set of evidence variables, which is a dictionary of assignments as {"A": True, "B": False}, 
+                containing the assignments of the evidence; or when used to check whether X and Y are d-separation by Z, is this a list containing all variables in Z
         :return: pruned network
         '''       
-        # print(type(e))
         if type(e) is dict():
             evidence_set = e.keys()
         else:
@@ -62,31 +62,38 @@ class BNReasoner_:
                 if len(child) == 0 and v not in Q and v not in evidence_set:
                     BayesNet.del_var(new_bn, v)                
                     i += 1    
-        #print(BayesNet.get_all_cpts(new_bn))
         return new_bn  
 
     def d_separation(self, X, Y, Z):
         '''
-        :param X, Y, Z: sets of var of which you want to know whether they are d-separated by Z
+         Given three sets of variables X, Y, and Z, determines
+            whether X is d-separated of Y given Z
+
+        :param X, Y, Z: lists of var of which you want to know whether X and Y are d-separated by Z
         :returns: True if X and Y are d-separated, False if they are not d-separated by Z
         '''        
         q = X + Y
         bn = self.Network_Pruning(q, Z)
         
-        #If there is no path between X and Y (order does not matter) means X and Y are d-separated
+        #If there is no path between X and Y means X and Y are d-separated
         for x in X:
             for y in Y:
                 if self.loop_over_children(bn, y, x):
                     if self.loop_over_children(bn, x, y):
-                        return True, bn
-        return False, bn
+                        return True
+        return False
      
     def loop_over_children(self,bn, y, parent):
-        '''Checks if y is a descendant of parent'''
+        '''
+        Checks if y is a descendant of parent
 
-        # print("parent: ", parent)
+        :param bn: a BN
+        :param y: a variable of the bn
+        :param parent: a variable in the bn
+        :returns: True, if there is no path between parent and y, False, otherwise
+        '''
+
         children = BayesNet.get_children(bn, parent)
-        # print("children: ", children)
         if len(children) == 0:
             return True
         else:
@@ -100,8 +107,11 @@ class BNReasoner_:
 
     def independence(self, X, Y, Z):
         '''
+        Given three sets of variables X, Y, and Z, determines
+            whether X is independent of Y given Z
+
         Implementation of Markov Property and Symmetry in DAGS to determine independence
-        :param X, Y, Z: sets of variable of which to decide whether X is independent of Y given Z
+        :param X, Y, Z: lists of variable of which to decide whether X is independent of Y given Z
         :returns: Bool, True if X and Y are independent given Z, False if X and Y are not independent given Z 
         '''
         Not_all_parents_of_X = False        
@@ -135,7 +145,7 @@ class BNReasoner_:
 
     def marginalization(self,cpt, X):
         '''
-        Given a factor and a variable X, compute the CPT in which X is summed-out
+        Given a factor and a variable X, computes the CPT in which X is summed-out
         :param cpt: a factor
         :param X: variable X
         :returns: the CPT in which X is summed-out
@@ -157,34 +167,35 @@ class BNReasoner_:
 
     def maxing_out(self,cpt,X): 
         '''
-        Given a factor and a variable X, compute the CPT in which X is maxed-out
+        Given a factor and a variable X, computes the CPT in which X is maxed-out
         :param cpt: a factor
         :param X: variable X
-        :returns: the CPT in which X is maxed-out
+        :returns: the CPT in which X is maxed-out, including the extended factor
         '''
         
         newcpt = deepcopy(cpt)
-        remaining_vars = [x for x in newcpt.columns if x != X and x != 'p']
         
-        # if len(list(newcpt.columns)) == 1:
-        #     p = newcpt["p"].max()
-        #     newcpt = pd.DataFrame({" ": ["T"], "p":[p]})
-        # else:
+        remaining_vars = [x for x in newcpt.columns if x != X and x != 'p' and x != 'extended factor']
+
         if len(remaining_vars) != 0:
             newcpt = newcpt.loc[newcpt.groupby(remaining_vars)['p'].idxmax()]
-        cpt_with_extended_factor = list()
-        for x in newcpt.columns:
-            if x != X:
-                cpt_with_extended_factor.append(x)
-        cpt_with_extended_factor.append(X)
-        newcpt = newcpt[cpt_with_extended_factor]
+        else:
+            newcpt = newcpt.loc[newcpt["p"].round(10) == max(newcpt['p'].round(10))]
+        
+        if 'extended factor' not in newcpt.columns:
+            newcpt['extended factor'] = X + ': ' + newcpt[X].astype(str)
+        else:            
+            newcpt['extended factor'] = newcpt['extended factor'].astype(str) + ', ' + X + ': ' + newcpt[X].astype(str)
+            
 
+        if X in list(newcpt.columns):
+            newcpt = newcpt.drop([X],axis=1)
 
         return newcpt
 
     def multiply_factors(self,f,g):
         '''
-        Given two factors f and g, compute the multiplied factor h=fg
+        Given two factors f and g, computes the multiplied factor h=fg
         :param f: Factor f
         :param g: Factor g
         :returns: Multiplied factor h=f*g
@@ -212,15 +223,18 @@ class BNReasoner_:
             h = merged.drop(['p_x','p_y'],axis=1)
         return h
 
-    def minimum_fill_ordering(self, bn, set):
+    def minimum_fill_ordering(self, set): 
         '''
-        :param bn: Bayesnet of which an ordering needs to be returned based on minimum fill
-        :returns: a string containing an ordering based on minumum fill
+        Given a set of variables X in the Bayesian network, computes a
+            good ordering for the elimination of X based on the min-fill heuristics 
+
+        :param set: list of variables X in the Bayesian network of which an ordering needs to be returned based on minimum fill
+        :returns: a list containing an ordering based on minumum fill
         '''
         order = list()
     
         #dictionary of all edges in the interaction graph
-        _, edges = self.least_edges(bn, set)
+        _, edges = self.least_edges(set)
             
         #saves number of added edges for each variable when that node would be removed
         dict_added_edges = dict()
@@ -247,9 +261,10 @@ class BNReasoner_:
 
     def min_fill(self, variables, edges, set):
         '''
-        :param variables: a list with all variables that are not yet in the ordering
-        :param edges: a dictionary containing all the edges of the variables not yet in the ordering/ 
-                    stillin the interaction graph
+        :param variables: a list with variables that are not yet in the ordering, that do need to be in it
+        :param edges: a dictionary containing all the edges of those variables not yet in the ordering/ 
+                    still in the interaction graph
+        :param set: list of all variable that need to be in the ordering
         :returns: the variable which would, when removed add the least number of edges
         '''
         dict_fill = dict()
@@ -259,15 +274,18 @@ class BNReasoner_:
             dict_fill[var] = added_edges   
         return sorted(dict_fill.items(), key=lambda item: item[1])[0][0]        
         
-    def minimum_degree_ordering(self, bn, set):
+    def minimum_degree_ordering(self, set):
         '''
-        :param bn: Bayesian network for which an ordering needs to be returned based on minimum degree
-        :returns: a string containing an ordering based on minumum fill
+        Given a set of variables X in the Bayesian network, computes a
+            good ordering for the elimination of X based on the min-degree heuristics 
+
+        :param set: list of variables X in the Bayesian network of which an ordering needs to be returned based on minimum degree
+        :returns: a list containing an ordering based on minumum degree
         '''
         order = list()
 
         #get the var that has the least edges and a dict containing for each variable the edges in the interaction graph
-        to_del_var, edges = self.least_edges(bn, set)
+        to_del_var, edges = self.least_edges(set)
         order.append(to_del_var)
 
         #remove var and add edges if necessary
@@ -283,8 +301,8 @@ class BNReasoner_:
         
     def min_deg(self, variables, edges):
         '''
-        :param variables: a list with all variables that are not yet in the ordering
-        :param edges: a dictionary containing all the edges of the variables not yet in the ordering/ 
+        :param variables: a list with all variables that are not yet in the ordering, but do need to be in it
+        :param edges: a dictionary containing all the edges of those variables not yet in the ordering/ 
                     still in the interaction graph
         :returns: the variable with the least number of edges
         '''
@@ -293,16 +311,20 @@ class BNReasoner_:
             dict_degrees[var] = len(edges[var]) 
         return sorted(dict_degrees.items(), key=lambda item: item[1])[0][0]
 
-    def least_edges(self, bn, set):
+    def least_edges(self, set):
+        '''
+        :param set: a list with variables that still need to be added to the ordering
+        :returns: the variable with the least number of edges and a dictionary containing the edges for each variable in the set
+        '''
         dict_nr_edges = dict()
         dict_edges = dict()
         for var in set:
             dict_nr_edges[var] = 0
             dict_edges[var] = list()
  
-        all_var = BayesNet.get_all_variables(bn)
+        all_var = BayesNet.get_all_variables(self.bn)
         for var in all_var:
-            children = BayesNet.get_children(bn, var)
+            children = BayesNet.get_children(self.bn, var)
             if var in set:
                 dict_nr_edges[var] += len(children)
             for child in children:
@@ -315,13 +337,14 @@ class BNReasoner_:
 
     def connect_nodes(self, var, edges, set):  
         '''
-        adds edges between nodes if necessary when var is removed and removes var
+        adds edges between nodes if necessary when a variable is removed and removes the variable
         and count the number of added edges
         :param var: string containing the variable to be deleted
-        :param edges: dict containing all edges of each variable
-        :returns: a dict containing for all variables that are not yet in the ordering , the 
+        :param edges: dict containing all edges of each variable in the parameter "set"
+        :param set: a list containing all variables in the bn that need to be in the ordering, but have not been added yet
+        :returns: a dict containing for all variables that are not yet in the ordering , the edges
                   in the graph, including the edges added when var is removed
-                : an integer that count the number of edges that are added when var is removed
+                : an integer that counts the number of edges that are added when var is removed
         '''
         edge_added = 0 
                   
@@ -346,6 +369,8 @@ class BNReasoner_:
 
     def variable_elimination(self, cpts, to_sum_out_vars, order =None):
         '''
+        : Sum out a set of variables by using variable elimination.
+
         :param cpts: a dictionary containing the cpts 
         :param to_sum_out_vars: List of variables that need to be summed out
         :param e: a series of assignments as tuples, containing the evidence
@@ -372,8 +397,8 @@ class BNReasoner_:
         elif order == "minimum_degree_ordering":
             order = self.minimum_degree_ordering(self.bn, to_sum_out_vars)
         else:
-            order = self.minimum_fill_ordering(self.bn, to_sum_out_vars)                 
-
+            order = self.minimum_fill_ordering(self.bn, to_sum_out_vars)
+        # print(order)
         #do the variable elimination
         done = list()
         n = None
@@ -390,23 +415,27 @@ class BNReasoner_:
                 if len(to_multiply) > 1:
                     for factor in to_multiply[1:]:
                         n = self.multiply_factors(n, factor)
+
                     
             else:      
                 for factor in to_multiply:
-                    n = self.multiply_factors(n, factor)    
+                    n = self.multiply_factors(n, factor)  
 
             n = self.marginalization(n, s)
-
+        
         #Multiply by all factors
         for var in q:
             if var not in done:
                 n = self.multiply_factors(n, self.bn.get_cpt(var))
-                  
+
         return n   
 
     def joint_prob(self):
+        '''
+        Calculares the joint probability of a BN
+        :returns: a CPT containing the joint probability of the BN
+        '''
         cpts = self.bn.get_all_cpts()
-       # print(cpts)
         i = 0
         for var in (cpts):
             if i == 0:
@@ -419,16 +448,18 @@ class BNReasoner_:
     def marginal_distribution(self, Q, e={}, order = None):  
         '''
         Given query variables Q and possibly empty
-        evidence e, compute the marginal distribution P(Q|e). Note that Q is a
-        subset of the variables in the Bayesian network X with Q ⊂ X but can also
+        evidence e, computes the marginal distribution P(Q|e). Q is a
+        subset of the variables in the Bayesian network X with Q ⊂ X, but can also
         be Q = X
-        :param Q: list of queri variables
-        :param e: a series of assignments as tuples, containing the evidence
+
+        :param Q: list of query variables
+        :param e: a dictionary of assignments, containing the evidence
+        :param order: possibly a string containing an ordering type
         :returns: marginal distribution P(Q|e)
         '''
         
         to_sum_out = self.bn.get_all_variables()
-        for var in Q:
+        for var in Q:            
             to_sum_out.remove(var) 
 
         if len(to_sum_out) == 0:
@@ -442,29 +473,49 @@ class BNReasoner_:
                     cpt[var] = BayesNet.get_compatible_instantiations_table(pd.Series(e), cpt[var])
                     
             # calculate the prior marginal of Q:
-            cpt = self.variable_elimination(cpt, to_sum_out, order)
+            cpt = self.variable_elimination(cpt, to_sum_out, order)            
             
-            if len(e) != 0:  
+            if len(e) != 0: 
                 Pr_e = cpt["p"].sum()
                 cpt['p'] = cpt['p']/Pr_e
                 #cpt is now the posterior marginal of Q
 
-            return cpt
+            return cpt         
     
     def map(self, q,e={}, order=None):
-        p_Q_E = self.marginal_distribution(q,e, order) 
-        p_Q_E = p_Q_E.loc[p_Q_E["p"].round(10) == max(p_Q_E['p'].round(10))]
-        p_Q_E[" "] = 'T'
-        list_order_cpt = list()
-        for item in list(p_Q_E.columns):
-            if item == 'p':
-                list_order_cpt = [' ', 'p'] + list_order_cpt
-            elif item != ' ':
-                list_order_cpt.append(item)
-        p_Q_E = p_Q_E[list_order_cpt]
+        '''
+        Computes the maximum a-posteriory instantiation and the value of query variables Q, given a possibly empty evidence e.
+
+        :param q: list of query variables
+        :param e: a dictionary of assignments, containing the evidence
+        :param order: possibly a string containing an ordering type
+        :return: maximum a-posteriory instantiation, including the extended factor
+        '''
+        all_var = self.bn.get_all_variables()
+        to_sum_out = list()
+        for var in all_var:
+            if var not in q:
+                to_sum_out.append(var)
+        cpts = self.bn.get_all_cpts()
+        if len(e) != 0:                
+            for var in cpts:
+                cpts[var] = BayesNet.get_compatible_instantiations_table(pd.Series(e), cpts[var])
+
+        p_Q_E = self.variable_elimination(cpts, to_sum_out, order)
+        for var in q:
+            p_Q_E = self.maxing_out(p_Q_E, var)
+   
         return p_Q_E    
 
     def mpe(self, e, ordering = None):
+        '''
+        Computes the most probable explanation given an evidence e.
+
+        :param e: dictionary containing the evidence and its truth assignments
+        :param order: possibly a string containing an ordering type
+        :return: most probable explanation, including the extended factor
+        
+        '''
         
         pruned_bn = self.Network_Pruning(Q=[], e=e)
         f = deepcopy(BayesNet.get_all_cpts(pruned_bn))
@@ -515,30 +566,25 @@ class BNReasoner_:
             n = self.maxing_out(n, s)
        
         n[" "] = 'T'
-        p = n["p"].max()
-        
+        p = n["p"].max()        
         n = n[n['p'] == p]
 
-        list_order_cpt = list()
-        for item in list(n.columns):
-            if item == 'p':
-                list_order_cpt = [' ', 'p'] + list_order_cpt
-            elif item != ' ':
-                list_order_cpt.append(item)
+        list_order_cpt = [' ', 'p', 'extended factor'] 
         n = n[list_order_cpt]
+
         return n  
 
 Pruning = False
-check_d_separation = False#True
-Independence = False#True
+check_d_separation = False
+Independence = False
 Marginalization = False
 MaxingOut =  False
-MultiplyFactor = False #True
-Ordering = True
-Variable_Elimination = False#True
-Marginal_distribution = False#True
-Map = False#True
-Mpe = False#True
+MultiplyFactor = False
+Ordering = False
+Variable_Elimination = False
+Marginal_distribution = False
+Map = False
+Mpe = False
 
 if Pruning:
     #Test case, show pruning is working as it should by showing that it returns the same (pruned) BN and CPTs as slide 31 of the third Bayes' lecture
@@ -554,12 +600,11 @@ if check_d_separation:
     X = ["Sprinkler?"]
     Y = ["Slippery Road?"]
     Z = ["Winter?"]
-    d_sep, bn = bnreasoner.d_separation(X,Y,Z)
+    d_sep = bnreasoner.d_separation(X,Y,Z)
     if d_sep:
         print(d_sep,", ", X, "is d-separated from ", Y, "by ", Z)
     else:
         print(d_sep,", ", X, "is not d-separated from ", Y, "by ", Z)
-    bn.draw_structure()
 
 if Independence:
     
@@ -616,54 +661,66 @@ if MultiplyFactor:
     Y = 'Rain?'
     cpt_1 = BayesNet.get_cpt(bnreasoner.bn, X)
     cpt_2 = BayesNet.get_cpt(bnreasoner.bn,Y)
-    print(cpt_1)
-    print(cpt_2)
-    print()
     print(bnreasoner.multiply_factors(cpt_1,cpt_2)) 
     
 if Ordering:
-    # BNReasoner_("testing/lecture_example2.BIFXML").bn.draw_structure()
-    # BNReasoner_("testing/lecture_example2.BIFXML").bn.draw_structure() #BNReasoner_("testing/lecture_example2.BIFXML")#
-    bnreasoner = BNReasoner_("testing/lecture_example2.BIFXML")
-    Set = ["X", "O", "J", "Y"]#BayesNet.get_all_variables(bnreasoner.bn) #["Winter?","Rain?", "Wet Grass?", "Sprinkler?"]#
-    print(bnreasoner.minimum_degree_ordering(bnreasoner.bn, Set))
-    Set = ["X","Y", "O", "J"]
-    print(bnreasoner.minimum_fill_ordering(bnreasoner.bn, Set))
+    #Test case: For  both orderings the ordering should always start with “Slippery Road?” the order of the other variables 
+    #does not matter, are all valid, as after “Slippery Road?” is removed, they all have 2 edges and would all add one edge when removed.  
+    bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
+    Set = bnreasoner.bn.get_all_variables()
+    print(bnreasoner.minimum_degree_ordering( Set))
+    print(bnreasoner.minimum_fill_ordering(Set))
 
 if Variable_Elimination:
+    #Test case: The returned CPT should be equivalent to the by hand calculated CPT on which variable elimination is applied. Eliminating the variables:
+    #"Winter?", "Rain?", "Wet Grass?" and "Sprinkler?”. This resulted in the hand calculated CPT:
+    #“Slippery Road?”	p
+    # True			0.364
+    # False			0.636
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
     Set = ["Winter?", "Rain?", "Wet Grass?","Sprinkler?"]
-    # print(Set)
-    print(type(bnreasoner.bn.get_all_cpts(),))
-    Pr_set = bnreasoner.variable_elimination(bnreasoner.bn.get_all_cpts(), to_sum_out_vars=Set, order = "minimum_degree_ordering")
-    print("---------")
-    print(Pr_set)
-
-if Marginal_distribution:
-    #Ik weet niet zeker of deze klopt
-    bnreasoner = BNReasoner_("testing/usecase.BIFXML")
-    q = ["jaundice", "liver-cancer"]
-    evidence = {"hepatitis":True, "excessive-alcohol-use": False}
+    print(bnreasoner.variable_elimination(bnreasoner.bn.get_all_cpts(), to_sum_out_vars=Set))
     
-    print("Pr(Q,e)")
+if Marginal_distribution:
+    #Test case: With Q = “Winter?” and “Rain?”, and with evidence e = “Sprinkler?” : True, the hand calculated CPT that needs to be returned is for the prior marginal: 
+    # Rain?  Winter?     P
+    # True     True  0.48
+    # False     True  0.12
+    # True    False  0.04
+    # False    False  0.36 
+    # and for the posterior marginal:
+    # Winter?  Rain?         P
+    # True   	True 	0.228571
+    # True 	False  	0.057143
+    # False   	True  	0.071429
+    # False  	False  	0.642857
+    #Which should be equal to the CPTs that are returned below
+
+    bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
+    q = ["Winter?", "Rain?"]
+    evidence = {"Sprinkler?": True}
+    
+    print("Posterior Marginal:")
     print(bnreasoner.marginal_distribution(q,evidence))
-    print("Pr(Q)")
+    print("Prior Marginal:")
     print(bnreasoner.marginal_distribution(q))
     
 if Map:
-    bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
-    q = ["Winter?", "Rain?", "Slippery Road?"]
-    evidence = {"Sprinkler?":True}
-    
+    # Test case: Given the BN, which can also be found in the provided lecture_example2.BIFXML and the query 
+    # given in example 2 on slides 20-21 of the fourth Bayes’ lecture. Our implementation of MAP 
+    # returns the values for J and I, given O = True, namely, J = False, I = False, but as the 
+    # values for J = False, I = True and J = False, I = False are the same both instantiation
+    # give a correct result.
+    bnreasoner = BNReasoner_("testing/lecture_example2.BIFXML")
+    q = ["I", "J"]
+    evidence = {"O":True}    
     print(bnreasoner.map(q,evidence))
-    print(bnreasoner.map(q))
-    q = ["Slippery Road?", "Wet Grass?"]
-    evidence = {"Rain?":True, "Winter?":False}
-    print(bnreasoner.map(q))
-
+    
 if Mpe:
-    #Returns only the assignments of the var that have been maxed out, want rest is irrelevant
-    #Vaker runnen als je een random extra row heb
-    bnreasoner = BNReasoner_("testing/usecase.BIFXML")
-    evidence = {"hepatitis": False}
-    print(bnreasoner.mpe(evidence, "minimum_degree_ordering"))
+    # Test case: Given the BN, which can also be found in the provided lecture_example2.BIFXML and 
+    # the query given in example 1 on slides 18-19 of the fourth Bayes’ lecture. Our implementation 
+    # of MPE should return the same probability and extended factor (and it does)
+    #
+    bnreasoner = BNReasoner_("testing/lecture_example2.BIFXML")
+    evidence = {"O": False, "J": True}
+    print(bnreasoner.mpe(evidence))
