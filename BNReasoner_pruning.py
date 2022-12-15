@@ -449,8 +449,7 @@ class BNReasoner_:
             return cpt
     
     def map(self, q,e={}, order=None):
-        # p_Q_E = self.marginal_distribution(q,e, order) 
-        p_Q_E = self.variable_elimination(q,e, order)
+        p_Q_E = self.marginal_distribution(q,e, order) 
         p_Q_E = p_Q_E.loc[p_Q_E["p"].round(10) == max(p_Q_E['p'].round(10))]
         p_Q_E[" "] = 'T'
         list_order_cpt = list()
