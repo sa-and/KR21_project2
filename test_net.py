@@ -1,12 +1,11 @@
 from BNReasoner import BNReasoner
-import time
 
 
 def test_d_separation(reasoner):
     print("--- test d separation ---")
-    X = ["Winter?", "Slippery Road?"]
-    Y = ["Rain?"]
-    Z = ["Sprinkler?"]
+    X = ["Rain?"]
+    Y = ["Sprinkler?"]
+    Z = ["Winter?"]
     print(f"Are X: {X} and Y: {Y} d-separated by Z: {Z}?")
     print(reasoner.are_d_seperated(X, Y, Z))
 
@@ -29,11 +28,13 @@ def test_marginalization(reasoner):
 
 
 def test_pruning(reasoner):
-    Q = ["Rain?"]
-    E = {"Winter?": True, "Sprinkler?": False, "Wet Grass?": True}
+    Q = ["Rain?", "Winter?", "Sprinkler?"]
+    E = {"Wet Grass?": True}
+
     print("==map on unpruned net==")
     p, instantiations = reasoner.MAP(Q, E)
     print(f"most likely instantion of Q: {Q}:\n{instantiations}\n with p={p}")
+
     pruned_net = reasoner.prune(Q, E)
     reasoner.bn = pruned_net
     # run MAP on pruned_net
@@ -56,14 +57,14 @@ def test_factors_multiplication(reasoner):
 
 def test_min_degree_ordering(reasoner):
     print("--- test min degree ordering ---")
-    X = ["Winter?", "Sprinkler?", "Slippery Road?"]
+    X = ["Winter?", "Rain?", "Slippery Road?"]
     order = reasoner.min_degree_ordering(X)
     print(f"order:\n {order}")
 
 
 def test_min_fill_ordering(reasoner):
     print("--- test min fill ordering ---")
-    X = ["Winter?", "Sprinkler?", "Slippery Road?"]
+    X = ["Winter?", "Rain?", "Slippery Road?"]
     order = reasoner.min_fill_ordering(X)
     print(f"order:\n {order}")
 
@@ -123,7 +124,7 @@ if __name__ == "__main__":
     reasoner = BNReasoner("testing/lecture_example.BIFXML")
     # test_min_degree_ordering(reasoner)
     # test_min_fill_ordering(reasoner)
-    test_variable_elimination(reasoner)
+    # test_variable_elimination(reasoner)
     # test_marginal_distribution(reasoner)
     # test_max_out(reasoner)
     # test_map(reasoner)
@@ -132,4 +133,4 @@ if __name__ == "__main__":
     # reasoner.bn.draw_structure()
     # test_independence(reasoner)
     # test_marginalization(reasoner)
-    # test_pruning(reasoner)
+    test_pruning(reasoner)

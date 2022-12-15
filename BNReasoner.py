@@ -2,6 +2,7 @@ from typing import Union
 from BayesNet import BayesNet
 from copy import deepcopy
 from networkx.utils import UnionFind
+from random import shuffle
 import pandas as pd
 import networkx as nx
 import itertools
@@ -117,17 +118,9 @@ class BNReasoner:
         return True
 
     # marginalize by summing-out
-    def marginalize_sum(self, factor: pd.DataFrame, var: str) -> pd.DataFrame:
+    def marginalize(self, factor: pd.DataFrame, var: str) -> pd.DataFrame:
         vars = [col_name for col_name in factor.columns if col_name not in [var, "p", " "]]
         marginalized = factor.groupby(vars).sum().reset_index()
-        if 'p' in marginalized.columns:
-            marginalized = marginalized.drop(var, axis=1)
-
-        return marginalized
-
-    def marginalize_max(self, factor: pd.DataFrame, var: str) -> pd.DataFrame:
-        vars = [col_name for col_name in factor.columns if col_name not in [var, "p", " "]]
-        marginalized = factor.groupby(vars).max().reset_index()
         if 'p' in marginalized.columns:
             marginalized = marginalized.drop(var, axis=1)
 
@@ -178,6 +171,13 @@ class BNReasoner:
 
         return truth_table
 
+    def random_ordering(self, X: list) -> list:
+        graph = self.bn.get_interaction_graph()
+        degrees = [x for x in graph.degree() if x[0] in X]
+        degrees.sort(key=lambda x: x[1])
+        ordered = [x[0] for x in degrees]
+        return shuffle(ordered)
+
     def min_degree_ordering(self, X: list) -> list:
         graph = self.bn.get_interaction_graph()
         degrees = [x for x in graph.degree() if x[0] in X]
@@ -206,11 +206,15 @@ class BNReasoner:
 
         return ordered
 
-    def variable_elimination(self, factors: list, X: list, ordering="min_degree", heuristic="max") -> pd.DataFrame:
-        if ordering == "min_degree":
+    def variable_elimination(self, factors: list, X: list, ordering: str) -> pd.DataFrame:
+        if ordering == "random":
+            shuffle(X)
+        elif ordering == "min_degree":
             X = self.min_degree_ordering(X)
-        else:
+        elif ordering == "min_fill":
             X = self.min_fill_ordering(X)
+        else:
+            raise ValueError("Give ordering method 'random', 'min_degree', or 'min_fill'")
 
         prev_factor = None
         for x in X:
@@ -219,16 +223,13 @@ class BNReasoner:
             # add prev_factor
             x_cpts += [prev_factor]
             multiplied = self.factors_multiplication(x_cpts)
-            if heuristic == "sum":
-                marginalized = self.marginalize_sum(multiplied, x)
-            else:
-                marginalized = self.marginalize_max(multiplied, x)
+            marginalized = self.marginalize(multiplied, x)
             prev_factor = marginalized
 
         # prev_factor after all iterations is a final marginalized factor
         return prev_factor
 
-    def marginal_distribution(self, Q: list, E: dict) -> pd.DataFrame:
+    def marginal_distribution(self, Q: list, E: dict, ordering: str) -> pd.DataFrame:
         all_cpts = self.bn.get_all_cpts()
         # reduce factors due to evidence E
         reduced_cpts = []
@@ -245,7 +246,7 @@ class BNReasoner:
         vars_to_eliminate.remove('p')
         vars_to_eliminate = list(vars_to_eliminate)
 
-        posterior_marginal = self.variable_elimination(reduced_cpts, vars_to_eliminate)
+        posterior_marginal = self.variable_elimination(reduced_cpts, vars_to_eliminate, ordering)
 
         return posterior_marginal
 
@@ -263,12 +264,12 @@ class BNReasoner:
 
     # Maximum A-Posteriori Query
     # it also checks for MPE case
-    def MAP(self, Q: list, E: dict) -> dict:
+    def MAP(self, Q: list, E: dict, ordering: str) -> dict:
         all_variables = self.bn.get_all_variables()
         MPE = Q == [var for var in all_variables if var not in E.keys()]
 
         if MPE:
-            print("using mpe")
+            # print("using mpe")
             all_cpts = self.bn.get_all_cpts()
             factor = self.factors_multiplication(list(all_cpts.values()))
             # drop rows incompatible with instantiation
@@ -278,7 +279,7 @@ class BNReasoner:
 
 
         else:
-            distribution = self.marginal_distribution(Q, E)
+            distribution = self.marginal_distribution(Q, E, ordering)
 
         # return row with highest p
         idx_max = distribution['p'].idxmax()
