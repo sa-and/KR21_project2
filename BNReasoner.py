@@ -117,9 +117,17 @@ class BNReasoner:
         return True
 
     # marginalize by summing-out
-    def marginalize(self, factor: pd.DataFrame, var: str) -> pd.DataFrame:
+    def marginalize_sum(self, factor: pd.DataFrame, var: str) -> pd.DataFrame:
         vars = [col_name for col_name in factor.columns if col_name not in [var, "p", " "]]
         marginalized = factor.groupby(vars).sum().reset_index()
+        if 'p' in marginalized.columns:
+            marginalized = marginalized.drop(var, axis=1)
+
+        return marginalized
+
+    def marginalize_max(self, factor: pd.DataFrame, var: str) -> pd.DataFrame:
+        vars = [col_name for col_name in factor.columns if col_name not in [var, "p", " "]]
+        marginalized = factor.groupby(vars).max().reset_index()
         if 'p' in marginalized.columns:
             marginalized = marginalized.drop(var, axis=1)
 
@@ -198,7 +206,7 @@ class BNReasoner:
 
         return ordered
 
-    def variable_elimination(self, factors: list, X: list, ordering="min_degree") -> pd.DataFrame:
+    def variable_elimination(self, factors: list, X: list, ordering="min_degree", heuristic="max") -> pd.DataFrame:
         if ordering == "min_degree":
             X = self.min_degree_ordering(X)
         else:
@@ -211,7 +219,10 @@ class BNReasoner:
             # add prev_factor
             x_cpts += [prev_factor]
             multiplied = self.factors_multiplication(x_cpts)
-            marginalized = self.marginalize(multiplied, x)
+            if heuristic == "sum":
+                marginalized = self.marginalize_sum(multiplied, x)
+            else:
+                marginalized = self.marginalize_max(multiplied, x)
             prev_factor = marginalized
 
         # prev_factor after all iterations is a final marginalized factor
