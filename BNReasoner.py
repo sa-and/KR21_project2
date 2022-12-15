@@ -145,65 +145,38 @@ class BNReasoner:
         row = original_ft.iloc[original_ft.p.idxmax()].copy()
         x_assignment = row[x]
         del row[x]
-        row[f'instantiation_{x}'] = x_assignment
         ft.loc[0,:] = row
-        return ft
+        return ft, x_assignment
 
     def _compute_sum_trivial(self, original_ft, ft, x):
         ft.loc[0, 'p'] = original_ft.p.sum()
         return ft
-    
-    def _compute_new_cpt(self, factor_table, x, which):
-        """
-        Given a factor and a variable X, compute the CPT in which X is either summed-out or maxed-out. (3pts)
-        """
-        columns = [col for col in factor_table.columns if col != 'p' and 'instantiation_' not in col and x != col]
-        inst_columns = [col for col in factor_table.columns if col.startswith('instantiation_')]
-        f = pd.DataFrame(columns = [*columns, 'p', *inst_columns])
-        if which == "max":
-            f[f"instantiation_{x}"] = []
-        
-        if len(columns) == 0:
-            if which == 'max':
-                return self._compute_max_trivial(factor_table, f, x)
-            else:
-                return self._compute_sum_trivial(factor_table, f, x)
-        instantiations = factor_table.groupby(columns).sum().index.values
-        if len(instantiations) == 0:
-            return factor_table
-        if type(instantiations[0]) != type(tuple()):
-            instantiations = list(map(lambda x: [x], instantiations))        
-        count = 0
 
-        for inst in instantiations:
-            inst_dict = {}
-            inst_list = []
-            for j in range(len(columns)):
-                inst_dict[columns[j]] = inst[j]
-                inst_list.append(inst[j])
-            inst_series = pd.Series(inst_dict)
-            comp_inst = self.bn.get_compatible_instantiations_table(inst_series, factor_table)
-            if which == 'max':
-                new_p = comp_inst.p.max()
-                row = comp_inst.loc[comp_inst["p"] == new_p]
-                inst_list.append(new_p)
-                for inst_column in inst_columns:
-                    inst_list.append(row[inst_column].values[0])
-                inst_list.append(row[x].values[0])
-            elif which == 'sum':  
-                new_p = comp_inst.p.sum()
-                inst_list.append(new_p)
-            
-            f.loc[count] = inst_list
+    def _max_out(self, factor_table, x):
+        group_by_vars = [col for col in factor_table if col not in ['p', x]]
+        if len(group_by_vars) == 0:
+            idx = factor_table.p.idxmax()
+            assignment = factor_table.loc[idx][x]
+            return pd.DataFrame(), pd.Series([assignment], index=[idx])
+        lines = factor_table.groupby(group_by_vars).p.idxmax()
+        ft = factor_table.loc[lines].copy()
+        assignments = factor_table.loc[lines, x].copy()
+        del ft[x]
+        return ft, assignments
 
-            count += 1 
-        return f
+    def _sum_out(self, factor_table, x):
+        group_by_vars = [col for col in factor_table if col not in ['p', x]]
+        if len(group_by_vars) == 0:
+            return self._compute_sum_trivial(factor_table, pd.DataFrame(), x)
+        table = factor_table.groupby(group_by_vars, as_index=False).sum()
+        del table[x]
+        return table
 
     def marginalize(self, factor, x):
         """
         Given a factor and a variable X, compute the CPT in which X is summed-out. (3pts)
         """
-        return self._compute_new_cpt(self.bn.get_cpt(factor), x, 'sum')
+        return self._max_out(self.bn.get_cpt(factor), x)
 
     def maxing_out(self, factor: str, x):
         """
@@ -211,7 +184,7 @@ class BNReasoner:
         to also keep track of which instantiation of X led to the maximized value. (5pts)
         
         """
-        return self._compute_new_cpt(self.bn.get_cpt(factor), x, 'max')
+        return self._max_out(self.bn.get_cpt(factor), x)
 
     def _mult_as_factor(self, factor_table_f, factor_table_g):
         X = pd.DataFrame(columns = factor_table_f.columns)
@@ -262,13 +235,42 @@ class BNReasoner:
 
         return df
 
+    def _better_mult(self, factor_table1, factor_table2):
+        
+        """
+        Given two factors (as CPTs (Pandas Data Frames)), return the outer product of the two factors with new probabilities (probs of the single factors multiplied).
+        Input:
+            fact_1: First factor (CPT / Pandas DataFrame)
+            fact_2: Second factor (CPT / Pandas DataFrame)
+        Returns:
+            new_cpt: CPT which displays the outer product of the two factors where the probabilities of the single factors are multiplied.
+        """
+        common_columns = list(set(factor_table1.columns).intersection(set(factor_table2.columns)) - {'p'})
+        if len(common_columns) == 0:
+            if len(factor_table1.columns) == 1:
+                return factor_table2
+            elif len(factor_table2.columns) == 1:
+                return factor_table1
+            else:
+                factor_table1['temp'] = 1
+                factor_table2['temp'] = 1
+                new_cpt = pd.merge(factor_table1, factor_table2, on=['temp'], how='outer')
+                del factor_table1['temp']
+                del factor_table2['temp']
+                del new_cpt['temp']
+        else:
+            new_cpt = pd.merge(factor_table1, factor_table2, on = common_columns, how='outer')
+        new_cpt['p'] = new_cpt['p_x'] * new_cpt['p_y']
+        new_cpt.drop(['p_x', 'p_y'], axis=1, inplace=True)
+        return new_cpt
+
     def factor_mult(self, factor_f, factor_g):
         """
         Given two factors f and g, compute the multiplied factor h=fg. (5pts)
         """
         factor_table_f = self.bn.get_cpt(factor_f)
         factor_table_g = self.bn.get_cpt(factor_g)
-        return self._mult_as_factor(factor_table_f, factor_table_g)
+        return self._better_mult(factor_table_f, factor_table_g)
 
     def _get_elim_order(self, vars, elim_method):
         if elim_method == 'min_degree':
@@ -297,16 +299,14 @@ class BNReasoner:
                 cpt = self.bn.get_cpt(neighbor)
                 continue
             neighbor_cpt = self.bn.get_cpt(neighbor)
-            cpt = self._mult_as_factor(cpt, neighbor_cpt) 
-        cpt = self._compute_new_cpt(cpt, var, 'sum') # Sum out variable
-        # cpt.p /= cpt.p.sum() # normalize for joint probability
+            cpt = self._better_mult(cpt, neighbor_cpt) 
+        cpt = self._sum_out(cpt, var) # Sum out variable
         return cpt, neighbors
 
     def variable_elimination(self, X: set[str], elim_method: Union[Literal['min_fill'], Literal['min_degree']] = 'min_degree'):
         """
         Variable Elimination: Sum out a set of variables by using variable elimination.
         (5pts)
-        This does not return anything but leaves the BN in a pruned/factored state.
         """
         to_eliminate = set(self.bn.get_all_variables()) - X
         to_eliminate = self._get_elim_order(to_eliminate, elim_method)
@@ -352,16 +352,15 @@ class BNReasoner:
     def minfill_ordering(self, X):
         interaction_graph = self.bn.get_interaction_graph()
         order = []
-
         for i in range(len(X)): 
             lowest_fill = self.lowest_fill(interaction_graph, X)
             order.append(lowest_fill)
             interaction_graph = self.remove_node_interaction(lowest_fill, interaction_graph)
             X.remove(lowest_fill)
         return order
-   
+
     def lowest_fill(self, graph, X):
-        lowest_fill = 100
+        lowest_fill = 1e10
         name = "test"
         for var in X: 
             amount = self.amount_added_interaction(var, graph)
@@ -406,14 +405,13 @@ class BNReasoner:
         compute the marginal distribution P(Q|e). Note that Q is a subset of 
         the variables in the Bayesian network X with Q ⊂ X but can also be Q = X. (2.5pts)"""
         vars_to_keep = Q.union(set(e.index))
-        # self.prune(Q, e)
         self._reduce_all_factors(e)
         self.variable_elimination(vars_to_keep, elim_method)
         jptd = self.multiply_all_tables() # joint probability distribution Pr(Q ^ e)
         ept = jptd
         for q in Q:# Sum out all variabes in Q from Pr(Q ^ e) to obtain Pr(e)
-            ept = self._compute_new_cpt(ept, q, 'sum')
-        
+            ept = self._sum_out(ept, q)
+
         pre = BayesNet.get_compatible_instantiations_table(e, ept)
         if len(pre) != 1:
             return pre
@@ -432,54 +430,61 @@ class BNReasoner:
                 assignments[var_key] = val
         return pd.Series(assignments)
 
-    def map(self, Q: set[str], e: pd.Series, ret_jptd=False, elim_method='min_degree'):
+    def map(self, Q: set[str], e: pd.Series, elim_method='min_degree'):
         """Compute the maximum a-posteriory instantiation + value of query variables Q, given a possibly empty evidence e. (3pts)"""
         # self.prune(Q, e)
         vars_to_keep = Q.union(set(e.index))
         self.variable_elimination(vars_to_keep, elim_method)
         jptd = self.multiply_all_tables() # joint probability distribution Pr(Q ^ e)
+        jptd = BayesNet.get_compatible_instantiations_table(e, jptd)
         ept = jptd
+        q_assignments = {}
         for q in Q:
-            ept = self._compute_new_cpt(ept, q, 'max')
-        ept = BayesNet.get_compatible_instantiations_table(e, ept)
-        if len(ept) != 1:
-            return ept
-        return self._assignments_from_ept(ept)
+            ept, assignments = self._max_out(ept, q)
+            q_assignments[q] = assignments
+        final = {}
+        i = assignments.index.values[0]
+        for q, a in q_assignments.items():
+            final[q] = a[i]
+        return pd.Series(final)
 
     def mpe(self, Q, e): 
         #Start with edge pruning and node pruning 
         #Get elimination order
         #maximize out for order 
-        # self.prune(Q,e)
+        self.prune(Q,e)
         vars_to_keep = Q.union(set(e.index))
         self._reduce_all_factors(e)
         self.variable_elimination(vars_to_keep) # elminate all variables we don't need
+        q_assignments = {}
         for var in Q:
-        # order = self.min_degree_ordering(set(self.bn.get_all_variables()) - vars_to_keep)
-        # for var in order:
             list_childeren = self.bn.get_children(var)
-            # breakpoint()
             for child in list_childeren: 
                 multiply_table  = self.factor_mult(var, child)
                 self.bn.update_cpt(child, multiply_table)
-                table =  self.maxing_out(child, var)
+                table, assignments =  self.maxing_out(child, var)
+                q_assignments[var] = assignments
                 self.bn.update_cpt(child, table)
                 
             if len(list_childeren) == 0:
-                table = self.maxing_out(var, var)
+                table, assignments = self.maxing_out(var, var)
+                q_assignments[var] = assignments
                 self.bn.update_cpt(var,table)
             else:
                 self.bn.del_var(var)
-        end_table = self.multiply_all_tables()
-        end_table = BayesNet.get_compatible_instantiations_table(e, end_table)
-        return self._assignments_from_ept(end_table)
+        breakpoint()
+        final = {}
+        i = assignments.index.values[0]
+        for q, a in q_assignments.items():
+            final[q] = a[i]
+        return pd.Series(final)
 
     def multiply_all_tables(self): 
         all_tables = self.bn.get_all_cpts()
         all_tables_list = list(all_tables.values())
         end_table  = all_tables_list[0]
         for i in range(1, len(all_tables_list)): 
-            end_table = self._mult_as_factor(end_table,  all_tables_list[i])
+            end_table = self._better_mult(end_table,  all_tables_list[i])
 
         return end_table
 
@@ -513,12 +518,18 @@ def test_dsep():
     assert reasoner.dsep(set(['Positive X-Ray?', 'Smoker?']), set(['Dyspnoea?']), set(['Bronchitis?', 'Tuberculosis or Cancer?']))
     assert reasoner.dsep(set(['Positive X-Ray?']), set(['Smoker?']), set(['Lung Cancer?']))
     assert not reasoner.dsep(set(['Positive X-Ray?']), set(['Smoker?']), set(['Dyspnoea?', 'Lung Cancer?']))
+    assert not reasoner.dsep({'Lung Cancer?'}, {'Smoker?'}, set())
 
 def profile_ve():
-    reasoner = BNReasoner('testing/rand_bn_nodes_5_0.BIFXML')
-    Q = {'0', '2'}
-    e = pd.Series({'1': True, '4': True})
-    print(reasoner.map(Q, e))
+    # reasoner = BNReasoner('testing/rand_bn_nodes_15_0.BIFXML')
+    # # Q = {'0', '2'}
+    # # e = pd.Series({'1': True, '4': True})
+    # # print(reasoner.map(Q, e))
+    # print(reasoner.map({'1', '2', '10'}, pd.Series(dtype=object)))
+    reasoner = BNReasoner('testing/rand_bn_nodes_10_0.BIFXML')
+    Q = {'Parkinsons?', 'Hospital?'}
+    e = pd.Series({'Physica examination?': True, 'Treatment?': True, 'Tremor?': True, 'Age?': True, 'Hereditary disease?': True})
+    print(reasoner.map(Q, e, elim_method='min_fill'))
 
 def main():
     profile_ve()
