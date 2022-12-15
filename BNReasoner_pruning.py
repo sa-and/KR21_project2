@@ -20,7 +20,7 @@ class BNReasoner_:
 
     # TODO: This is where your methods should go
     # print("hi")
-    def Network_Pruning(self, bn, Q, e):
+    def Network_Pruning(self, Q, e):
         '''
         :param bn: Bayesnetwork
         :param Q: (query) set of variables, in case of d-separation the var of which you want to know whether they are d-separated
@@ -34,7 +34,7 @@ class BNReasoner_:
             evidence_set = e.keys()
         else:
             evidence_set = e
-        new_bn = deepcopy(bn)
+        new_bn = deepcopy(self.bn)
         children = dict()
 
         #Get edges between nodes by asking for children, which are saved in a list (children)
@@ -67,12 +67,11 @@ class BNReasoner_:
 
     def d_separation(self, X, Y, Z):
         '''
-        :param bn: Bayes network
         :param X, Y, Z: sets of var of which you want to know whether they are d-separated by Z
         :returns: True if X and Y are d-separated, False if they are not d-separated by Z
         '''        
         q = X + Y
-        bn = self.Network_Pruning(self.bn, q, Z)
+        bn = self.Network_Pruning(q, Z)
         
         #If there is no path between X and Y (order does not matter) means X and Y are d-separated
         for x in X:
@@ -99,17 +98,16 @@ class BNReasoner_:
                         return False
             return True    
 
-    def independence(self, bn, X, Y, Z):
+    def independence(self, X, Y, Z):
         '''
         Implementation of Markov Property and Symmetry in DAGS to determine independence
-        :param bn: Bayesian Network
         :param X, Y, Z: sets of variable of which to decide whether X is independent of Y given Z
         :returns: Bool, True if X and Y are independent given Z, False if X and Y are not independent given Z 
         '''
         Not_all_parents_of_X = False        
         for x in X: 
-            for parent in BayesNet.get_all_variables(bn):
-                if x in BayesNet.get_children(bn, parent):
+            for parent in BayesNet.get_all_variables(self.bn):
+                if x in BayesNet.get_children(self.bn, parent):
                     if parent not in Z:
                         Not_all_parents_of_X = True
                         break
@@ -118,23 +116,19 @@ class BNReasoner_:
 
         if Not_all_parents_of_X:
             for y in Y: 
-                for parent in BayesNet.get_all_variables(bn):
-                    if y in BayesNet.get_children(bn, parent):
-                       # print(parent)
+                for parent in BayesNet.get_all_variables(self.bn):
+                    if y in BayesNet.get_children(self.bn, parent):
                         if parent not in Z:
                             return False 
             for y in Y:
-                # print(y)
                 for x in X:
-                    # print(self.loop_over_children(bn, x, y))
-                    if not self.loop_over_children(bn, x, y):
-                        # print(x, "is not a descendent of ", y)
+                    if not self.loop_over_children(self.bn, x, y):
                         return False
             return True
 
         for x in X:
             for y in Y:
-                if not self.loop_over_children(bn, y, x):
+                if not self.loop_over_children(self.bn, y, x):
                     return False
                      
         return True 
@@ -161,7 +155,7 @@ class BNReasoner_:
 
         return newcpt
 
-    def maxing_out(self,cpt,X):
+    def maxing_out(self,cpt,X): 
         '''
         Given a factor and a variable X, compute the CPT in which X is maxed-out
         :param cpt: a factor
@@ -176,7 +170,15 @@ class BNReasoner_:
         #     p = newcpt["p"].max()
         #     newcpt = pd.DataFrame({" ": ["T"], "p":[p]})
         # else:
-        newcpt = newcpt.loc[newcpt.groupby(remaining_vars)['p'].idxmax()]
+        if len(remaining_vars) != 0:
+            newcpt = newcpt.loc[newcpt.groupby(remaining_vars)['p'].idxmax()]
+        cpt_with_extended_factor = list()
+        for x in newcpt.columns:
+            if x != X:
+                cpt_with_extended_factor.append(x)
+        cpt_with_extended_factor.append(X)
+        newcpt = newcpt[cpt_with_extended_factor]
+
 
         return newcpt
 
@@ -341,6 +343,7 @@ class BNReasoner_:
 
     def variable_elimination(self, cpts, to_sum_out_vars, order =None):
         '''
+        :param cpts: a dictionary containing the cpts 
         :param to_sum_out_vars: List of variables that need to be summed out
         :param e: a series of assignments as tuples, containing the evidence
         :param order: a string containing the type of ordering, if no order is given a random order is picked
@@ -446,7 +449,8 @@ class BNReasoner_:
             return cpt
     
     def map(self, q,e={}, order=None):
-        p_Q_E = self.marginal_distribution(q,e, order) 
+        # p_Q_E = self.marginal_distribution(q,e, order) 
+        p_Q_E = self.variable_elimination(q,e, order)
         p_Q_E = p_Q_E.loc[p_Q_E["p"].round(10) == max(p_Q_E['p'].round(10))]
         p_Q_E[" "] = 'T'
         list_order_cpt = list()
@@ -460,7 +464,7 @@ class BNReasoner_:
 
     def mpe(self, e, ordering = None):
         
-        pruned_bn = self.Network_Pruning(self.bn, Q=[], e=e)
+        pruned_bn = self.Network_Pruning(Q=[], e=e)
         f = deepcopy(BayesNet.get_all_cpts(pruned_bn))
         
         all_var = deepcopy(BayesNet.get_all_variables(pruned_bn))
@@ -512,7 +516,7 @@ class BNReasoner_:
         p = n["p"].max()
         
         n = n[n['p'] == p]
-        
+
         list_order_cpt = list()
         for item in list(n.columns):
             if item == 'p':
@@ -523,7 +527,7 @@ class BNReasoner_:
         return n  
 
 Pruning = False
-check_d_separation = False #True
+check_d_separation = False#True
 Independence = False #True
 Marginalization = False
 MaxingOut = False
@@ -531,13 +535,13 @@ MultiplyFactor = False #True
 Ordering = False #True
 Variable_Elimination = False#True
 Marginal_distribution = False#True
-Map = False#True
-Mpe = True
+Map = True
+Mpe = False#True
 
 if Pruning:
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
     Queri, evidence = ["Wet Grass?"], {"Winter?": True,"Rain?": False}
-    return_bn = bnreasoner.Network_Pruning(bnreasoner.bn, Queri, evidence)
+    return_bn = bnreasoner.Network_Pruning(Queri, evidence)
     print("----------------------")
     print(return_bn.get_all_cpts())
     return_bn.draw_structure()
@@ -558,10 +562,10 @@ if Independence:
     #maar I guess dat het werkt, het is gebaseerd op DAGs en de Markov Property en Symmetry
     #zijn denk ik geimplementeerd.
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
-    Y = ["Sprinkler?"]
-    X = ["Slippery Road?"]
-    Z = ["Winter?"] 
-    if bnreasoner.independence(bnreasoner.bn, X,Y,Z):
+    Y = ["Slippery Road?"]
+    X = ["Wet Grass?"]
+    Z = ["Rain?"] 
+    if bnreasoner.independence(X,Y,Z):
         print(X, "is independent from ", Y, "given ", Z)
     else:
         print(X, "is not independent from ", Y, "given ", Z)
@@ -597,6 +601,7 @@ if Variable_Elimination:
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
     Set = ["Winter?", "Rain?", "Wet Grass?","Sprinkler?"]
     # print(Set)
+    print(type(bnreasoner.bn.get_all_cpts(),))
     Pr_set = bnreasoner.variable_elimination(bnreasoner.bn.get_all_cpts(), to_sum_out_vars=Set, order = "minimum_degree_ordering")
     print("---------")
     print(Pr_set)
@@ -627,5 +632,5 @@ if Mpe:
     #Returns only the assignments of the var that have been maxed out, want rest is irrelevant
     #Vaker runnen als je een random extra row heb
     bnreasoner = BNReasoner_("testing/usecase.BIFXML")
-    evidence = {"cirrhosis": True, "liver-biopsy": True, "liver-cancer": False}
+    evidence = {"hepatitis": False}
     print(bnreasoner.mpe(evidence, "minimum_degree_ordering"))
