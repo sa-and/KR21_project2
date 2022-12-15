@@ -6,7 +6,7 @@ import os
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
-results_path = './experiment_results_new'
+results_path = 'experiment_results'
 if not os.path.exists(results_path):
     os.makedirs(results_path)
 figsize = (8, 6)
