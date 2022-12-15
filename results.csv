@@ -114,3 +114,8 @@ n_nodes,model_path,prune (y/n),|Q|,|e|,map/mpe,order_method,iteration,time
 15,testing/rand_bn_nodes_15_2.BIFXML,True,5,5,map,min_fill,2,306439025000
 15,testing/rand_bn_nodes_15_2.BIFXML,True,5,5,map,min_fill,3,83822622000
 15,testing/rand_bn_nodes_15_2.BIFXML,True,5,5,map,min_fill,4,382444350000
+15,testing/rand_bn_nodes_15_3.BIFXML,True,5,5,map,min_fill,0,2559113034000
+15,testing/rand_bn_nodes_15_3.BIFXML,True,5,5,map,min_fill,1,1368737903000
+15,testing/rand_bn_nodes_15_3.BIFXML,True,5,5,map,min_fill,2,4118171284000
+15,testing/rand_bn_nodes_15_3.BIFXML,True,5,5,map,min_fill,3,2787905837000
+15,testing/rand_bn_nodes_15_3.BIFXML,True,5,5,map,min_fill,4,2803641690000

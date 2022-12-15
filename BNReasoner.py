@@ -4,6 +4,7 @@ from BayesNet import BayesNet
 import itertools 
 import networkx as nx
 from copy import deepcopy
+import cProfile
 
 class BNReasoner:
     def __init__(self, net: Union[str, BayesNet]):
@@ -139,6 +140,18 @@ class BNReasoner:
         and independence) (1.5pts)
         """
         return self.dsep(X, Y, Z)
+
+    def _compute_max_trivial(self, original_ft: pd.DataFrame, ft, x):
+        row = original_ft.iloc[original_ft.p.idxmax()].copy()
+        x_assignment = row[x]
+        del row[x]
+        row[f'instantiation_{x}'] = x_assignment
+        ft.loc[0,:] = row
+        return ft
+
+    def _compute_sum_trivial(self, original_ft, ft, x):
+        ft.loc[0, 'p'] = original_ft.p.sum()
+        return ft
     
     def _compute_new_cpt(self, factor_table, x, which):
         """
@@ -150,6 +163,11 @@ class BNReasoner:
         if which == "max":
             f[f"instantiation_{x}"] = []
         
+        if len(columns) == 0:
+            if which == 'max':
+                return self._compute_max_trivial(factor_table, f, x)
+            else:
+                return self._compute_sum_trivial(factor_table, f, x)
         instantiations = factor_table.groupby(columns).sum().index.values
         if len(instantiations) == 0:
             return factor_table
@@ -216,8 +234,6 @@ class BNReasoner:
             f = {}
             g = {} 
             for n, variable in enumerate(vars):
-                if type(i[n]) == type([]):
-                    breakpoint()
                 if variable in factor_table_f.columns:
                     f[variable] = i[n]
                 if variable in factor_table_g.columns:
@@ -283,7 +299,7 @@ class BNReasoner:
             neighbor_cpt = self.bn.get_cpt(neighbor)
             cpt = self._mult_as_factor(cpt, neighbor_cpt) 
         cpt = self._compute_new_cpt(cpt, var, 'sum') # Sum out variable
-        cpt.p /= cpt.p.sum() # normalize for joint probability
+        # cpt.p /= cpt.p.sum() # normalize for joint probability
         return cpt, neighbors
 
     def variable_elimination(self, X: set[str], elim_method: Union[Literal['min_fill'], Literal['min_degree']] = 'min_degree'):
@@ -400,7 +416,6 @@ class BNReasoner:
         
         pre = BayesNet.get_compatible_instantiations_table(e, ept)
         if len(pre) != 1:
-            print('uh oh', pre)
             return pre
     
         pre = pre.p.values[0]
@@ -410,6 +425,7 @@ class BNReasoner:
 
     def map(self, Q: set[str], e: pd.Series, ret_jptd=False, elim_method='min_degree'):
         """Compute the maximum a-posteriory instantiation + value of query variables Q, given a possibly empty evidence e. (3pts)"""
+        self.prune(Q, e)
         vars_to_keep = Q.union(set(e.index))
         self.variable_elimination(vars_to_keep, elim_method)
         jptd = self.multiply_all_tables() # joint probability distribution Pr(Q ^ e)
@@ -418,7 +434,6 @@ class BNReasoner:
             ept = self._compute_new_cpt(ept, q, 'max')
         ept = BayesNet.get_compatible_instantiations_table(e, ept)
         if len(ept) != 1:
-            print('uh oh', ept)
             return ept
         row = ept.iloc[0]
         assignments = {}
@@ -429,7 +444,7 @@ class BNReasoner:
         return pd.Series(assignments)
 
     def mpe(self, Q, e): 
-        #Start with edge pruning and note pruning 
+        #Start with edge pruning and node pruning 
         #Get elimination order
         #maximize out for order 
         self.prune(Q,e)
@@ -444,7 +459,6 @@ class BNReasoner:
                 self.bn.update_cpt(child, table)
                 
             if len(list_childeren) == 0: 
-                var_table = self.bn.get_cpt(var)
                 table = self.maxing_out(var, var)
                 self.bn.update_cpt(var,table)
             else:
@@ -461,7 +475,6 @@ class BNReasoner:
 
         return end_table
 
-
 def test_prune():
     reasoner = BNReasoner('testing/lecture_example.BIFXML')
     e = pd.Series({'Rain?': False})
@@ -477,15 +490,9 @@ def test_map():
     reasoner = BNReasoner('testing/lecture_example2.BIFXML')
     Q = {'I', 'J'}
     e = pd.Series({'O': True})
-    breakpoint()
-    assignments, jpt = reasoner.map(Q, e, ret_jptd=True)
+    assignments = reasoner.map(Q, e)
     assert assignments['I'] == False
     assert assignments['J'] == False
-
-
-def test_variable_elimination():
-    reasoner = BNReasoner()
-
 
 def test_dsep():
     """
@@ -499,20 +506,14 @@ def test_dsep():
     assert reasoner.dsep(set(['Positive X-Ray?']), set(['Smoker?']), set(['Lung Cancer?']))
     assert not reasoner.dsep(set(['Positive X-Ray?']), set(['Smoker?']), set(['Dyspnoea?', 'Lung Cancer?']))
 
+def profile_ve():
+    reasoner = BNReasoner('testing/rand_bn_nodes_15_0.BIFXML')
+    Q = {'4', '3', '9', '8'}
+    e = pd.Series({'1': True, '5': True})
+    print(reasoner.map(Q, e))
 
 def main():
-    # test_map()
-    reasoner = BNReasoner('testing/lecture_example3.BIFXML')
-
-    e = pd.Series({'Smoker?': True})
-    Q = {'Lung Cancer?', 'Dyspnoea?', 'Positive X-Ray?'}
-
-    # # jptd = reasoner.variable_elimination(set(['Smoker?', 'Tuberculosis?']), 'min_degree')
-    print(reasoner.map(Q, e))
-    # reasoner.ve_int(Q)
-    # reasoner.marginal_distribution(Q, e)
-    # reasoner.maxing_out('Wet Grass?', 'Wet Grass?')
-    breakpoint()
+    profile_ve()
 
 if __name__ == '__main__':
     main()
