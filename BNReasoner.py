@@ -406,7 +406,7 @@ class BNReasoner:
         compute the marginal distribution P(Q|e). Note that Q is a subset of 
         the variables in the Bayesian network X with Q ⊂ X but can also be Q = X. (2.5pts)"""
         vars_to_keep = Q.union(set(e.index))
-        self.prune(Q, e)
+        # self.prune(Q, e)
         self._reduce_all_factors(e)
         self.variable_elimination(vars_to_keep, elim_method)
         jptd = self.multiply_all_tables() # joint probability distribution Pr(Q ^ e)
@@ -423,9 +423,18 @@ class BNReasoner:
         jptd.p /= pre # Compute Pr(Q ^ e) / Pr(e)
         return jptd
 
+    def _assignments_from_ept(self, ept):
+        row = ept.iloc[0]
+        assignments = {}
+        for i, val in row.items():
+            if i.startswith('instantiation_'):
+                var_key = i.replace('instantiation_', '')
+                assignments[var_key] = val
+        return pd.Series(assignments)
+
     def map(self, Q: set[str], e: pd.Series, ret_jptd=False, elim_method='min_degree'):
         """Compute the maximum a-posteriory instantiation + value of query variables Q, given a possibly empty evidence e. (3pts)"""
-        self.prune(Q, e)
+        # self.prune(Q, e)
         vars_to_keep = Q.union(set(e.index))
         self.variable_elimination(vars_to_keep, elim_method)
         jptd = self.multiply_all_tables() # joint probability distribution Pr(Q ^ e)
@@ -435,36 +444,35 @@ class BNReasoner:
         ept = BayesNet.get_compatible_instantiations_table(e, ept)
         if len(ept) != 1:
             return ept
-        row = ept.iloc[0]
-        assignments = {}
-        for i, val in row.items():
-            if i.startswith('instantiation_'):
-                var_key = i.replace('instantiation_', '')
-                assignments[var_key] = val
-        return pd.Series(assignments)
+        return self._assignments_from_ept(ept)
 
     def mpe(self, Q, e): 
         #Start with edge pruning and node pruning 
         #Get elimination order
         #maximize out for order 
-        self.prune(Q,e)
+        # self.prune(Q,e)
         vars_to_keep = Q.union(set(e.index))
-        order = self.min_degree_ordering(set(self.bn.get_all_variables()) - vars_to_keep)
-        for var in order:
+        self._reduce_all_factors(e)
+        self.variable_elimination(vars_to_keep) # elminate all variables we don't need
+        for var in Q:
+        # order = self.min_degree_ordering(set(self.bn.get_all_variables()) - vars_to_keep)
+        # for var in order:
             list_childeren = self.bn.get_children(var)
+            # breakpoint()
             for child in list_childeren: 
                 multiply_table  = self.factor_mult(var, child)
                 self.bn.update_cpt(child, multiply_table)
                 table =  self.maxing_out(child, var)
                 self.bn.update_cpt(child, table)
                 
-            if len(list_childeren) == 0: 
+            if len(list_childeren) == 0:
                 table = self.maxing_out(var, var)
                 self.bn.update_cpt(var,table)
             else:
                 self.bn.del_var(var)
         end_table = self.multiply_all_tables()
-        return end_table
+        end_table = BayesNet.get_compatible_instantiations_table(e, end_table)
+        return self._assignments_from_ept(end_table)
 
     def multiply_all_tables(self): 
         all_tables = self.bn.get_all_cpts()
@@ -507,9 +515,9 @@ def test_dsep():
     assert not reasoner.dsep(set(['Positive X-Ray?']), set(['Smoker?']), set(['Dyspnoea?', 'Lung Cancer?']))
 
 def profile_ve():
-    reasoner = BNReasoner('testing/rand_bn_nodes_15_0.BIFXML')
-    Q = {'4', '3', '9', '8'}
-    e = pd.Series({'1': True, '5': True})
+    reasoner = BNReasoner('testing/rand_bn_nodes_5_0.BIFXML')
+    Q = {'0', '2'}
+    e = pd.Series({'1': True, '4': True})
     print(reasoner.map(Q, e))
 
 def main():
