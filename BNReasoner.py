@@ -378,6 +378,12 @@ class BNReasoner:
                 lowest_degree = value
                 name = i 
         return name 
+
+    def _reduce_all_factors(self, e: pd.Series):
+        for var in self.bn.get_all_variables():
+            cpt = self.bn.get_cpt(var)
+            cpt = BayesNet.reduce_factor(e, cpt)
+            self.bn.update_cpt(var, cpt)
     
     def marginal_distribution(self, Q, e, elim_method='min_degree'):
         """Given query variables Q and possibly empty evidence e, 
@@ -385,20 +391,42 @@ class BNReasoner:
         the variables in the Bayesian network X with Q ⊂ X but can also be Q = X. (2.5pts)"""
         vars_to_keep = Q.union(set(e.index))
         self.prune(Q, e)
+        self._reduce_all_factors(e)
         self.variable_elimination(vars_to_keep, elim_method)
-        jptd = self.multiply_all_tables()
-        return BayesNet.get_compatible_instantiations_table(e, jptd)
+        jptd = self.multiply_all_tables() # joint probability distribution Pr(Q ^ e)
+        ept = jptd
+        for q in Q:# Sum out all variabes in Q from Pr(Q ^ e) to obtain Pr(e)
+            ept = self._compute_new_cpt(ept, q, 'sum')
+        
+        pre = BayesNet.get_compatible_instantiations_table(e, ept)
+        if len(pre) != 1:
+            print('uh oh', pre)
+            return pre
+    
+        pre = pre.p.values[0]
+        jptd = BayesNet.get_compatible_instantiations_table(e, jptd)
+        jptd.p /= pre # Compute Pr(Q ^ e) / Pr(e)
+        return jptd
 
     def map(self, Q: set[str], e: pd.Series, ret_jptd=False, elim_method='min_degree'):
         """Compute the maximum a-posteriory instantiation + value of query variables Q, given a possibly empty evidence e. (3pts)"""
-        jptd = self.marginal_distribution(Q, e, elim_method=elim_method)
-        row = jptd.loc[pd.to_numeric(jptd.p).idxmax()]
-        for i in e.index:
-            del row[i]
-        del row['p']
-        if ret_jptd:
-            return row, jptd
-        return row
+        vars_to_keep = Q.union(set(e.index))
+        self.variable_elimination(vars_to_keep, elim_method)
+        jptd = self.multiply_all_tables() # joint probability distribution Pr(Q ^ e)
+        ept = jptd
+        for q in Q:
+            ept = self._compute_new_cpt(ept, q, 'max')
+        ept = BayesNet.get_compatible_instantiations_table(e, ept)
+        if len(ept) != 1:
+            print('uh oh', ept)
+            return ept
+        row = ept.iloc[0]
+        assignments = {}
+        for i, val in row.items():
+            if i.startswith('instantiation_'):
+                var_key = i.replace('instantiation_', '')
+                assignments[var_key] = val
+        return pd.Series(assignments)
 
     def mpe(self, Q, e): 
         #Start with edge pruning and note pruning 
@@ -415,17 +443,13 @@ class BNReasoner:
                 table =  self.maxing_out(child, var)
                 self.bn.update_cpt(child, table)
                 
-            
             if len(list_childeren) == 0: 
                 var_table = self.bn.get_cpt(var)
                 table = self.maxing_out(var, var)
                 self.bn.update_cpt(var,table)
             else:
                 self.bn.del_var(var)
-        breakpoint()
         end_table = self.multiply_all_tables()
-
-        # end_table = end_table.dropna()
         return end_table
 
     def multiply_all_tables(self): 
@@ -455,7 +479,7 @@ def test_map():
     e = pd.Series({'O': True})
     breakpoint()
     assignments, jpt = reasoner.map(Q, e, ret_jptd=True)
-    assert assignments['I'] == True
+    assert assignments['I'] == False
     assert assignments['J'] == False
 
 
@@ -482,10 +506,11 @@ def main():
 
     e = pd.Series({'Smoker?': True})
     Q = {'Lung Cancer?', 'Dyspnoea?', 'Positive X-Ray?'}
+
     # # jptd = reasoner.variable_elimination(set(['Smoker?', 'Tuberculosis?']), 'min_degree')
-    # print(reasoner.map(Q, e))
+    print(reasoner.map(Q, e))
     # reasoner.ve_int(Q)
-    reasoner.mpe(Q, e)
+    # reasoner.marginal_distribution(Q, e)
     # reasoner.maxing_out('Wet Grass?', 'Wet Grass?')
     breakpoint()
 
