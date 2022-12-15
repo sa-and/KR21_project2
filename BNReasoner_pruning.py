@@ -78,11 +78,11 @@ class BNReasoner_:
             for y in Y:
                 if self.loop_over_children(bn, y, x):
                     if self.loop_over_children(bn, x, y):
-                        return True
-        return False
+                        return True, bn
+        return False, bn
      
     def loop_over_children(self,bn, y, parent):
-        '''Checks for if y is a descendant of parent'''
+        '''Checks if y is a descendant of parent'''
 
         # print("parent: ", parent)
         children = BayesNet.get_children(bn, parent)
@@ -299,15 +299,18 @@ class BNReasoner_:
         for var in set:
             dict_nr_edges[var] = 0
             dict_edges[var] = list()
-
-        for var in set:
+ 
+        all_var = BayesNet.get_all_variables(bn)
+        for var in all_var:
             children = BayesNet.get_children(bn, var)
-            dict_nr_edges[var] += len(children)
+            if var in set:
+                dict_nr_edges[var] += len(children)
             for child in children:
+                if var in dict_edges:
                     dict_edges[var].append((var,child))  
-                    if child in set:              
-                        dict_edges[child].append((child, var))
-                        dict_nr_edges[child] += 1      
+                if child in set:              
+                    dict_edges[child].append((child, var))
+                    dict_nr_edges[child] += 1  
         return sorted(dict_nr_edges.items(), key=lambda item: item[1])[0][0], dict_edges
 
     def connect_nodes(self, var, edges, set):  
@@ -527,42 +530,44 @@ class BNReasoner_:
 
 Pruning = False
 check_d_separation = False#True
-Independence = False #True
+Independence = False#True
 Marginalization = False
-MaxingOut = False
+MaxingOut =  False
 MultiplyFactor = False #True
-Ordering = False #True
+Ordering = True
 Variable_Elimination = False#True
 Marginal_distribution = False#True
-Map = True
+Map = False#True
 Mpe = False#True
 
 if Pruning:
+    #Test case, show pruning is working as it should by showing that it returns the same (pruned) BN and CPTs as slide 31 of the third Bayes' lecture
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
-    Queri, evidence = ["Wet Grass?"], {"Winter?": True,"Rain?": False}
+    Queri, evidence = ["Wet Grass?"], {"Rain?": False, "Winter?": True}
     return_bn = bnreasoner.Network_Pruning(Queri, evidence)
-    print("----------------------")
     print(return_bn.get_all_cpts())
     return_bn.draw_structure()
-    
-#determine whether X is d-seperated from Y by Z
 if check_d_separation:
-    bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
-    Y = ["Slippery Road?"]
+    #Test case, show d-separation is working as it should by showing that it returns the same (pruned) BN and CPTs as were calculated by hand and described in the report
+    #The answer should be True/Yes/is d-separated, and the node "Wet Grass?" and the edges between "Winter?" and "Rain?" and between "Winter?" and "Sprinkler" should be deleted
+    bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")    
     X = ["Sprinkler?"]
+    Y = ["Slippery Road?"]
     Z = ["Winter?"]
-    if bnreasoner.d_separation(X,Y,Z):
-        print(X, "is d-separated from ", Y, "by ", Z)
+    d_sep, bn = bnreasoner.d_separation(X,Y,Z)
+    if d_sep:
+        print(d_sep,", ", X, "is d-separated from ", Y, "by ", Z)
     else:
-        print(X, "is not d-separated from ", Y, "by ", Z)
+        print(d_sep,", ", X, "is not d-separated from ", Y, "by ", Z)
+    bn.draw_structure()
 
 if Independence:
-    #Ik weet niet zeker of de implementatie van independence compleet of efficient is,
-    #maar I guess dat het werkt, het is gebaseerd op DAGs en de Markov Property en Symmetry
-    #zijn denk ik geimplementeerd.
+    
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
-    Y = ["Slippery Road?"]
+    #Test whether “Wet Grass?” is independent from “Slippery Road?” given “Rain?". We computed by 
+    #hand that this query should result in True, “Wet Grass” is independent form “Slippery Road?” given “Rain?”
     X = ["Wet Grass?"]
+    Y = ["Slippery Road?"]
     Z = ["Rain?"] 
     if bnreasoner.independence(X,Y,Z):
         print(X, "is independent from ", Y, "given ", Z)
@@ -570,30 +575,59 @@ if Independence:
         print(X, "is not independent from ", Y, "given ", Z)
 
 if Marginalization:
+    #Test case, the resulting CPT for "Rain?" summed-out of the CPT of "Wet Grass?" should be equal to: 
+    # Sprinkler?  Wet Grass?     P
+    # True        	True  	0.9+0.95 = 1.85
+    # True      	False  	0.05+0.1=0.15
+    # False        	True	0.8+0 = 0.80
+    # False       	False  	0.2+ 1 = 1.20
+    #
+
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
     X = "Rain?"
     cpt = BayesNet.get_cpt(bnreasoner.bn,"Wet Grass?")
-    # print(cpt)
     print(bnreasoner.marginalization(cpt, X))
 
 if MaxingOut:
+    #Test case, the resulting CPT for "Rain?" maxed-out of the CPT of "Rain?" should be equal to: 
+    # Winter?	P	
+    # True		0.8	Rain? = True
+    # False		0.9	Rain? = False
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
     X = "Rain?"
     cpt = BayesNet.get_cpt(bnreasoner.bn,X)
     print(bnreasoner.maxing_out(cpt,X))
    
 if MultiplyFactor:
+    #To show the multiplication function works we calculate the multiplication of the factors of “Sprinkler?” and “Rain?” by hand, which resulted in: 
+    # Winter?	Sprinkler? 	Rain?		P
+    # True		True		True		0.16
+    # True		True		False		0.04
+    # True		False		True		0.64
+    # True		False		False		0.16
+    # False		True		True		0.075
+    # False		True		False		0.675
+    # False		False		True		0.025
+    # False		False		False		0.225
+    #This should be/is equal to the result printed, when the following you run the following:
+
     bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
     X = 'Sprinkler?'
     Y = 'Rain?'
     cpt_1 = BayesNet.get_cpt(bnreasoner.bn, X)
     cpt_2 = BayesNet.get_cpt(bnreasoner.bn,Y)
+    print(cpt_1)
+    print(cpt_2)
+    print()
     print(bnreasoner.multiply_factors(cpt_1,cpt_2)) 
     
 if Ordering:
-    bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
-    Set = ["Winter?","Rain?", "Wet Grass?", "Sprinkler?"]#BayesNet.get_all_variables(bnreasoner.bn)
+    # BNReasoner_("testing/lecture_example2.BIFXML").bn.draw_structure()
+    # BNReasoner_("testing/lecture_example2.BIFXML").bn.draw_structure() #BNReasoner_("testing/lecture_example2.BIFXML")#
+    bnreasoner = BNReasoner_("testing/lecture_example2.BIFXML")
+    Set = ["X", "O", "J", "Y"]#BayesNet.get_all_variables(bnreasoner.bn) #["Winter?","Rain?", "Wet Grass?", "Sprinkler?"]#
     print(bnreasoner.minimum_degree_ordering(bnreasoner.bn, Set))
+    Set = ["X","Y", "O", "J"]
     print(bnreasoner.minimum_fill_ordering(bnreasoner.bn, Set))
 
 if Variable_Elimination:
@@ -607,9 +641,9 @@ if Variable_Elimination:
 
 if Marginal_distribution:
     #Ik weet niet zeker of deze klopt
-    bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
-    q = ["Winter?", "Rain?"]
-    evidence = {"Sprinkler?":True}
+    bnreasoner = BNReasoner_("testing/usecase.BIFXML")
+    q = ["jaundice", "liver-cancer"]
+    evidence = {"hepatitis":True, "excessive-alcohol-use": False}
     
     print("Pr(Q,e)")
     print(bnreasoner.marginal_distribution(q,evidence))
