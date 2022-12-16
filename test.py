@@ -8,27 +8,19 @@ import warnings
 warnings.filterwarnings("ignore")
 
 if __name__ == "__main__":
-    print("begin")
-
-    # net = 'testing/lecture_example2.BIFXML'
-
-    net = 'testing/lecture_example.BIFXML'
-    bn = BayesNet()
-    bn.load_from_bifxml(net)
-    bnr = BNReasoner(bn)
 
     Pruning = True
-    check_d_separation = False 
-    Independence = False 
-    Marginalization = False
-    MaxingOut = False
-    FactorMultiplication = False
-    Ordering_min_degree = False
-    Ordering_min_fill = False
-    Elimination = False
-    Marginal_distribution = False
-    checkMAP = False
-    checkMEP = False
+    check_d_separation = True 
+    Independence = True 
+    Marginalization = True
+    MaxingOut = True
+    FactorMultiplication = True
+    Ordering_min_degree = True
+    Ordering_min_fill = True
+    Elimination = True
+    Marginal_distribution = True
+    checkMAP = True
+    checkMEP = True
 
     ### Test pruning
     if Pruning:
@@ -36,6 +28,7 @@ if __name__ == "__main__":
         bn = BayesNet()
         bn.load_from_bifxml(net)
         bnr = BNReasoner(bn)
+        print("#----------------------------------------Pruning---------------------------------------#")
         outcome = bnr.pruning(["Wet Grass?"],{'Rain?': False,'Winter?':True})
         print(outcome)
 
@@ -46,10 +39,12 @@ if __name__ == "__main__":
         bn.load_from_bifxml(net)
         bnr = BNReasoner(bn)
         #outcome_d_not = bnr.d_separation(["family-out"], ["hear-bark"], ["light-on"]) # Not seperated
+        print("#-----------------------------------------D-seperation---------------------------------#")
         outcome_d = bnr.d_separation(["family-out"], ["bowel-problem"], ["light-on"]) # Seperated
+
         print(outcome_d)
    
-    ### Test independence
+    ## Test independence
     if Independence:
         net = 'testing/lecture_example.BIFXML'
         bn = BayesNet()
@@ -58,9 +53,11 @@ if __name__ == "__main__":
         Y = {"Winter?"}
         X = {"Slippery Road?"}
         Z = {} 
-        if bnr.independence(bnr.bn, X,Y,Z):
+        if bnr.check_independence(bnr.bn, X,Y,Z):
+            print("#--------------------------------Independence--------------------------------------#")
             print(X, "is independent from ", Y, "given ", Z)
         else:
+            print("#--------------------------------Independence--------------------------------------#")
             print(X, "is not independent from ", Y, "given ", Z)
 
     ### Test marginalization
@@ -72,6 +69,7 @@ if __name__ == "__main__":
         X = "Wet Grass?"
         Y = BayesNet.get_cpt(bnr.bn,X)
         outcome_marg = bnr.sum_out_factors(Y,X)
+        print("#-------------------------------Marginalization--------------------------------------#")
         print(outcome_marg)
 
     ### Test maxing out
@@ -83,6 +81,7 @@ if __name__ == "__main__":
         X = "Wet Grass?"
         Y = BayesNet.get_cpt(bnr.bn,X)
         outcome_max = bnr.maximise_out(Y,X)
+        print("#-------------------------------Maxing out-------------------------------------------#")
         print(outcome_max)
         
     ### Test factor multiplication
@@ -92,6 +91,7 @@ if __name__ == "__main__":
         bn.load_from_bifxml(net)
         bnr = BNReasoner(bn)
         outcome_factor = bnr.factor_multiplication(['Rain?', 'Wet Grass?'])
+        print("#-------------------------------Factor multiplication-------------------------------#")
         print(outcome_factor)
 
     ### Test ordering min   
@@ -101,7 +101,9 @@ if __name__ == "__main__":
         bn.load_from_bifxml(net)
         bnr = BNReasoner(bn)
         outcome_min_degree = bnr.min_degree()
+        print("#-------------------------------Ordering min degree----------------------------------#")
         print(outcome_min_degree)
+
 
     ### Test ordering min fill
     if Ordering_min_fill:
@@ -110,6 +112,7 @@ if __name__ == "__main__":
         bn.load_from_bifxml(net)
         bnr = BNReasoner(bn)
         outcome_min_fill = bnr.min_fill()
+        print("#--------------------------------Ordering min fill----------------------------------#")
         print(outcome_min_fill)
 
     ### Elimination
@@ -119,6 +122,7 @@ if __name__ == "__main__":
         bn.load_from_bifxml(net)
         bnr = BNReasoner(bn)
         outcome_elim = bnr.elimination(bn.get_cpt('Wet Grass?'), ['Rain?'])
+        print("#-------------------------------Elimination---------------------------------------#")
         print(outcome_elim)
 
     ### Marginal distribution
@@ -128,6 +132,7 @@ if __name__ == "__main__":
         bn.load_from_bifxml(net)
         bnr = BNReasoner(bn)
         outcome_md = bnr.compute_marginal(['Wet Grass?', 'Slippery Road?'], order=bnr.min_degree())
+        print("#-------------------------------Marginal distribution-----------------------------#")
         print(outcome_md)
 
     ### MAP
@@ -137,34 +142,17 @@ if __name__ == "__main__":
         bn.load_from_bifxml(net)
         bnr = BNReasoner(bn)
         outcome_map = bnr.MAP(['I', 'J'], pd.Series({'O': True}))
+        print("#-------------------------------------MAP-----------------------------------------#")
         print(outcome_map)
 
 
-    ### MPE
+    ## MPE
     if checkMEP:
         net = 'testing/lecture_example2.BIFXML'
         bn = BayesNet()
         bn.load_from_bifxml(net)
-        bnr = BNReasoner(bn)
+        bnr = BNReasoner(net)
         outcome_mpe = bnr.MPE(pd.Series({'J': True, 'O': False}))
+        print("#-------------------------------------MPE-----------------------------------------#")
         print(outcome_mpe)
 
-    # print(outcome)
-
-
-    # outcome.draw_structure()
-
-    X = "Wet Grass?"
-    Y = BayesNet.get_cpt(bnr.bn,X)
-    # f = bnr.multip_factors(Y)
-    print(Y)
-    outcome = bnr.sum_out_factors(Y,X) #bnr.maximise_out(Y,X)
-    print(outcome)
-    
-    ### Elimination
-    outcome_elim = bnr.elimination(bn.get_cpt('Wet Grass?'), ['Rain?'])
-    #outcome_elim = bnr.elimination(bn.get_cpt('Winter?'), ['Winter?']) # Empty Dataframe
-    print(outcome_elim)
-
-
-    #python3 test.py
