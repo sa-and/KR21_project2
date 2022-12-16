@@ -1,7 +1,7 @@
 import pandas as pd
 from typing import Union, Literal
 from BayesNet import BayesNet
-import itertools 
+import random
 import networkx as nx
 from copy import deepcopy
 import cProfile
@@ -218,8 +218,10 @@ class BNReasoner:
             return self.min_degree_ordering(vars)
         elif elim_method == 'min_fill':
             return self.minfill_ordering(vars)
-        else:
-            raise ValueError(f'elim_method {elim_method} not supported')
+        else: # Random 
+            varsshuffle = list(vars) 
+            random.shuffle(varsshuffle)
+            return varsshuffle
 
     def get_factors_using(self, var: str):
         cpts = self.bn.get_all_cpts()
@@ -244,7 +246,7 @@ class BNReasoner:
         cpt = self._sum_out(cpt, var) # Sum out variable
         return cpt, neighbors
 
-    def variable_elimination(self, X: set[str], elim_method: Union[Literal['min_fill'], Literal['min_degree']] = 'min_degree'):
+    def variable_elimination(self, X: set[str], elim_method: Union[Literal['min_fill'], Literal['min_degree'], Literal['random']] = 'min_degree'):
         """
         Variable Elimination: Sum out a set of variables by using variable elimination.
         (5pts)
@@ -364,15 +366,6 @@ class BNReasoner:
         jptd = BayesNet.get_compatible_instantiations_table(e, jptd)
         jptd.p /= pre # Compute Pr(Q ^ e) / Pr(e)
         return jptd
-
-    def _assignments_from_ept(self, ept):
-        row = ept.iloc[0]
-        assignments = {}
-        for i, val in row.items():
-            if i.startswith('instantiation_'):
-                var_key = i.replace('instantiation_', '')
-                assignments[var_key] = val
-        return pd.Series(assignments)
 
     def map(self, Q: set[str], e: pd.Series, elim_method='min_degree'):
         """Compute the maximum a-posteriory instantiation + value of query variables Q, given a possibly empty evidence e. (3pts)"""
