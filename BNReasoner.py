@@ -11,9 +11,6 @@ from itertools import product, combinations
 
 class BNReasoner:
     def __init__(self, net: Union[str, BayesNet]):
-        """
-        :param net: either file path of the bayesian network in BIFXML format or BayesNet object
-        """
         if type(net) == str:
             # constructs a BN object
             self.bn = BayesNet()
@@ -24,66 +21,52 @@ class BNReasoner:
 
     # TODO: This is where your methods should go
     def pruning(self,query: List[str], values: Dict[str, bool]) -> BayesNet:
-        """ Prune the network, will drop variables that are not needed anymore
 
-        Args:
-            query (List): Given query, used to check if nodes are part of it
-            values (Dict): The given evedince to a node, must be True or False. Structure: {Node:Value}
-            
-        Returns:
-            p: BayesNet.object, returns the new pruned network
-        """
-        print("pruning")
-        p = deepcopy(self.bn)
+        bayes_net = deepcopy(self.bn)
         finished = True # Continue checking if the pruning can continue
-        all_cpts = p.get_all_cpts() # A dictionary of all cps in the network indexed by the variable they belong to
+        all_cpts = bayes_net.get_all_cpts() # A dictionary of all cps in the network indexed by the variable they belong to
         while finished: # Stop pruning when the network cannot be pruned further
             finished = False
-            for var in p.get_all_variables(): 
-                if p.get_children(var) == [] and var not in query and var not in values: # Check if node is part of query
-                    p.del_var(var) # Delete node if not part of query
+            for var in bayes_net.get_all_variables(): 
+                if bayes_net.get_children(var) == [] and var not in query and var not in values: # Check if node is part of query
+                    bayes_net.del_var(var) # Delete node if not part of query
                     finished = True
             for a, b in values.items(): # Get node name and value
-                for variable in p.get_all_variables(): # Get all variables
+                for variable in bayes_net.get_all_variables(): # Get all variables
                     cpt = all_cpts[variable]
                     if a in cpt.columns: # If variable from input matches a variable from a cpt column:
                         new_cpt = cpt.drop(cpt[cpt[a] != b].index) # If the same node exist with the opposite value, delete it
-                        p.update_cpt(variable, new_cpt) # Update the cpt table without the opposite value
+                        bayes_net.update_cpt(variable, new_cpt) # Update the cpt table without the opposite value
                     else:
                         continue
-                for child in p.get_children(a): # Check if the removed node has children, if yes delete edge
-                    p.del_edge((a, child)) # Delete edge if input variable has child
+                for child in bayes_net.get_children(a): # Check if the removed node has children, if yes delete edge
+                    bayes_net.del_edge((a, child)) # Delete edge if input variable has child
                     finished = True
+<<<<<<< Updated upstream
         # print(p.get_all_cpts()," dit is p")
         return p
+=======
+        print(bayes_net.get_all_cpts()," dit is p")
+        return bayes_net
+>>>>>>> Stashed changes
 
     def d_separation(self, x: List[str], y: List[str], z: List[str]) -> bool:
-        """ Check if variable x is d-seperated from y given z
-
-        Args:
-            x (List): List of variables to check
-            y (list): List of variables to check if x is seperated from
-            z (list): List of given variables
-            
-        Returns:
-            bool: True is d-seperated, False if not
-        """
-        p = deepcopy(self.bn)
+        bayes_net = deepcopy(self.bn)
         reach_single = []
         iterated = []
         
-        for var in p.get_all_variables():
-            if p.get_children(var) == [] and var not in x and var not in y and var not in z:
-                p.del_var(var)
+        for var in bayes_net.get_all_variables():
+            if bayes_net.get_children(var) == [] and var not in x and var not in y and var not in z:
+                bayes_net.del_var(var)
         for var in z:
-            for child in p.get_children(var):
-                p.del_edge([var, child])
+            for child in bayes_net.get_children(var):
+                bayes_net.del_edge([var, child])
         for var in x:
             iterated.append(var) # Append variables to check
-            reach_single.extend(p.get_children(var)) # Append children
+            reach_single.extend(bayes_net.get_children(var)) # Append children
             while list(set(reach_single) - set(iterated)) !=[]: # While loop makes sure children of children are checked
                 for a in list(set(reach_single) - set(iterated)): # Make sure all children are checked
-                    reach_single.extend(p.get_children(a)) # Append children of children if there are any
+                    reach_single.extend(bayes_net.get_children(a)) # Append children of children if there are any
                     iterated.append(a) # Append variable to prevent loop from checking again
         for var_2 in y:
             if var_2 in reach_single: # If y in x, not d-seperated
@@ -93,31 +76,26 @@ class BNReasoner:
         return True
 
     def random_order(self, network: BayesNet = None) -> List[str]:
-        """
-        :return: a random ordering of all variables in self.bn
-        """
         if network is None:
             return list(np.random.permutation(self.bn.get_all_variables()))
         else:
             return list(np.random.permutation(network.get_all_variables()))
     
-    def min_degree(self) -> List[str]:
-        """Sort the nodes by looking at the degree
-
-        Returns:
-            List of variables sorted from small to big (degree in the interaction graph to the ordering)
-        """
-        p = deepcopy(self.bn)
-        return [x[0] for x in sorted(p.get_interaction_graph().degree(), key = lambda x: x[1])] # Sort list and only return the variable name
-
-    def min_fill(self) -> List[str]:
-        """ Minimum fill ordering
+    def min_degree(self, network: BayesNet = None) -> List[str]:
+        if network is None:
+            bayes_net = deepcopy(self.bn)
+        else:
+            bayes_net = deepcopy(network)
             
-        Returns:
-            List of variables sorted from small to big (whose deletion would add the fewest new interaction to the ordering)
-        """
-        p = deepcopy(self.bn)
-        i_graph = p.get_interaction_graph()
+        return [x[0] for x in sorted(bayes_net.get_interaction_graph().degree(), key = lambda x: x[1])] # Sort list and only return the variable name
+
+    def min_fill(self, network: BayesNet = None) -> List[str]:
+        if network is None:
+            bayes_net = deepcopy(self.bn)
+        else:
+            bayes_net = deepcopy(network)
+
+        i_graph = bayes_net.get_interaction_graph()
         order_edges = []
         for node in i_graph:
             i = 0
@@ -132,6 +110,7 @@ class BNReasoner:
             order_edges.append((node, i)) 
         return [x[0] for x in sorted(order_edges, key=lambda x: x[1])] # Sort the list and return only the variable name
 
+<<<<<<< Updated upstream
     def init_factor(self,variables: List[str], value=0) -> pd.DataFrame:
         """
         Generate a default CPT.
@@ -139,18 +118,15 @@ class BNReasoner:
         :param value:       Which the default p-value should be
         :return:            A CPT
         """
+=======
+    def init_factor(self, variables: List[str], value=0) -> pd.DataFrame:
+>>>>>>> Stashed changes
         truth_table = product([True, False], repeat=len(variables))
         factor = pd.DataFrame(truth_table, columns=variables)
         factor['p'] = value
         return factor
 
     def sum_out_factors(self, factor: Union[str, pd.DataFrame], subset: Union[str, list]) -> pd.DataFrame:
-        """
-        Sum out some variable(s) in subset from a factor.
-        :param factor:  factor over variables X
-        :param subset:  a subset of variables X
-        :return:        a factor corresponding to the factor with the subset summed out
-        """
         if isinstance(factor, str):
             factor = self.bn.get_cpt(factor)
         if isinstance(subset, str):
@@ -169,11 +145,6 @@ class BNReasoner:
         return new_factor.reset_index(drop=True)
 
     def maximise_out(self, factor: Union[str, pd.DataFrame], subset: Union[str, list]) -> pd.DataFrame:
-        """
-        :param factor:
-        :param subset:
-        :return:
-        """
         if isinstance(factor, str):
             factor = self.bn.get_cpt(factor)
         if isinstance(subset, str):
@@ -231,11 +202,6 @@ class BNReasoner:
         return h
 
     def factor_multiplication(self, factors: List[Union[str, pd.DataFrame]]) -> pd.DataFrame:
-        """
-        Multiply multiple factors with each other.
-        :param factors: a list of factors
-        :return:        a factor corresponding to the product of all given factors
-        """
         # If there are strings in the input-list of factors, replace them with the corresponding cpt
         for x, y in enumerate(factors):
             if isinstance(y, str):
@@ -266,12 +232,6 @@ class BNReasoner:
 
 
     def MPE(self, evidence: pd.Series, order_func: str = None) -> pd.DataFrame:
-        """
-        Compute the MPE instantiation for some given evidence.
-        :param evidence:
-        :param order_func:  String describing which order function to use
-        :return:            Dataframe describing the MPE instantiation
-        """
         N = deepcopy(self.bn)
         # Prune Edges
         for var in evidence.keys():
@@ -308,13 +268,6 @@ class BNReasoner:
         return res_factor
 
     def MAP(self, M: List[str], evidence: pd.Series, order_func: str = None) -> pd.DataFrame:
-        """
-        Compute the MAP instantiation for some variables and some given evidence.
-        :param M:           The MAP variables
-        :param evidence:
-        :param order_func:  String describing which order function to use
-        :return:            Dataframe describing the MAP instantiation
-        """
         if len(np.intersect1d(list(evidence.keys()), M)) > 0:
             raise Exception("Evidence cannot intersect with M")
 
@@ -351,6 +304,7 @@ class BNReasoner:
         res_factor = self.factor_multiplication(list(S.values())) if len(S) > 1 else S.popitem()[1]
         return res_factor
 
+<<<<<<< Updated upstream
     # def maximise_out(self, factor: Union[str, pd.DataFrame], subset: Union[str, list]) -> pd.DataFrame:
     #     """
     #     :param factor:
@@ -433,6 +387,41 @@ class BNReasoner:
         Returns:
             pd.Dataframe: Dataframe after elimination
         """
+=======
+    def compute_marginal(self, query: List[str], evidence: pd.Series = None, order: List[str] = None) -> pd.DataFrame:
+        if order is None:
+            order = self.random_order()
+
+        S = self.bn.get_all_cpts()
+
+        if evidence is not None:  # If there's evidence, reduce all CPTs using the evidence
+            for var in self.bn.get_all_variables():
+                var_cpt = self.bn.get_cpt(var)
+                if any(evidence.keys().intersection(var_cpt.columns)):  # If the evidence occurs in the cpt
+                    new_cpt = self.bn.get_compatible_instantiations_table(evidence, var_cpt)
+                    S[var] = new_cpt
+
+        pi = [nv for nv in order if nv not in query]
+        for var_pi in pi:
+            # Pop all functions from S, which mention var_pi...
+            func_k = [S.pop(key) for key, cpt in deepcopy(S).items() if var_pi in cpt]
+
+            new_factor = self.factor_multiplication(func_k)
+            new_factor = self.sum_out_factors(new_factor, var_pi)
+            # And replace them with the new factor
+            S[var_pi] = new_factor
+
+        res_factor = self.factor_multiplication(list(S.values())) if len(S) > 1 else S.popitem()[1]
+
+        if evidence is not None:  # Normalizing over pr_evidence
+            cpt_e = self.compute_marginal(list(evidence.keys()), order=order)
+            pr_evidence = float(self.bn.get_compatible_instantiations_table(evidence, cpt_e)['p'])
+            res_factor['p'] = res_factor['p'] / pr_evidence
+
+        return res_factor
+
+    def elimination(self, data: pd.DataFrame, var: List[str]) -> pd.DataFrame:
+>>>>>>> Stashed changes
         print(data, "initial dataframe")
         remaining = data.drop(columns=var) # Drop column thats need to be summed out
         rem_list = list(remaining.columns.values)[:-1] # Get remaining dataframe
@@ -445,9 +434,7 @@ class BNReasoner:
         return eliminated
 
     def loop_over_children(self,bn, y, parent):
-        '''Checks for if y is a descendant of parent'''
-
-        # print("parent: ", parent)
+      # print("parent: ", parent)
         children = BayesNet.get_children(bn, parent)
         # print("children: ", children)
         if len(children) == 0:
@@ -460,6 +447,7 @@ class BNReasoner:
                     if not self.loop_over_children(bn, y, child):
                         return False
             return True 
+<<<<<<< Updated upstream
             
     def independence(self, bn, X, Y, Z):
         '''
@@ -468,6 +456,10 @@ class BNReasoner:
         :param X, Y, Z: sets of variable of which to decide whether X is independent of Y given Z
         :returns: Bool, True if X and Y are independent given Z, False if X and Y are not independent given Z 
         '''
+=======
+
+    def check_independence(self, bn, X, Y, Z):
+>>>>>>> Stashed changes
         Not_all_parents_of_X = False        
         for x in X: 
             for parent in BayesNet.get_all_variables(bn):
@@ -482,7 +474,6 @@ class BNReasoner:
             for y in Y: 
                 for parent in BayesNet.get_all_variables(bn):
                     if y in BayesNet.get_children(bn, parent):
-                        print(parent)
                         if parent not in Z:
                             return False 
             for y in Y:
