@@ -3,7 +3,13 @@ from BayesNet import BayesNet
 import pandas as pd
 from copy import deepcopy
 import random
+import time
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+import os
 
+print("Finished importing")
 
 class BNReasoner_:
     def __init__(self, net: Union[str, BayesNet]):
@@ -223,7 +229,7 @@ class BNReasoner_:
             h = merged.drop(['p_x','p_y'],axis=1)
         return h
 
-    def minimum_fill_ordering(self, set): 
+    def minimum_fill_ordering(self, bnreasoner, set): 
         '''
         Given a set of variables X in the Bayesian network, computes a
             good ordering for the elimination of X based on the min-fill heuristics 
@@ -274,7 +280,7 @@ class BNReasoner_:
             dict_fill[var] = added_edges   
         return sorted(dict_fill.items(), key=lambda item: item[1])[0][0]        
         
-    def minimum_degree_ordering(self, set):
+    def minimum_degree_ordering(self, bnreasoner, set):
         '''
         Given a set of variables X in the Bayesian network, computes a
             good ordering for the elimination of X based on the min-degree heuristics 
@@ -582,145 +588,291 @@ MaxingOut =  False
 MultiplyFactor = False
 Ordering = False
 Variable_Elimination = False
-Marginal_distribution = False
-Map = False
-Mpe = False
+Marginal_distribution = True
+Map = True
+Mpe = True
 
-if Pruning:
-    #Test case, show pruning is working as it should by showing that it returns the same (pruned) BN and CPTs as slide 31 of the third Bayes' lecture
-    bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
-    Queri, evidence = ["Wet Grass?"], {"Rain?": False, "Winter?": True}
-    return_bn = bnreasoner.Network_Pruning(Queri, evidence)
-    print(return_bn.get_all_cpts())
-    return_bn.draw_structure()
-if check_d_separation:
-    #Test case, show d-separation is working as it should by showing that it returns the same (pruned) BN and CPTs as were calculated by hand and described in the report
-    #The answer should be True/Yes/is d-separated, and the node "Wet Grass?" and the edges between "Winter?" and "Rain?" and between "Winter?" and "Sprinkler" should be deleted
-    bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")    
-    X = ["Sprinkler?"]
-    Y = ["Slippery Road?"]
-    Z = ["Winter?"]
-    d_sep = bnreasoner.d_separation(X,Y,Z)
-    if d_sep:
-        print(d_sep,", ", X, "is d-separated from ", Y, "by ", Z)
+#file = "testing/lecture_example.BIFXML"
+file = "testing/usecase.BIFXML"
+#Queri, evidence = ["Wet Grass?"], {"Rain?": False, "Winter?": True}
+#Queri, evidence = ['liver-biopsy'], {"hepatitis":True, "cirrhosis":False, 'metastases':True}
+
+trials = 1000
+qs = [
+    ['hepatitis'],
+    ['hepatitis'],
+    ['genetic-predisposition-cancer'],
+    ['genetic-predisposition-cancer']
+]
+es = [
+    {"liver-cancer":True},
+    {"liver-cancer":True, "liver-biopsy":False, "cirrhosis":True, "jaundice":True, "excessive-alcohol-use":True},
+    {"cirrhosis":False},
+    {"hepatitis":True, "jaundice":False, "excessive-alcohol-use":True, "liver-biopsy":False}
+]
+text_to_plot = [
+    "1 related evidence",
+    "all related evidences",
+    "1 unrelated evidence",
+    "all unrelated evidence"
+]
+
+for iter in range(len(qs)):
+    Queri, evidence = qs[iter], es[iter]
+
+    result_marginal = {'data_fill':[], 'data_degree':[]}
+    result_map = {'data_fill':[], 'data_degree':[]}
+    result_mpe = {'data_fill':[], 'data_degree':[]}
+
+    for trial_number in range(trials):
+        if trial_number % 10 == 0:
+            print(f"Trail: {trial_number}")
+        if Pruning:
+            #Test case, show pruning is working as it should by showing that it returns the same (pruned) BN and CPTs as slide 31 of the third Bayes' lecture
+            bnreasoner = BNReasoner_(file)
+            Queri, evidence = ["Wet Grass?"], {"Rain?": False, "Winter?": True}
+            return_bn = bnreasoner.Network_Pruning(Queri, evidence)
+            print(return_bn.get_all_cpts())
+            return_bn.draw_structure()
+        if check_d_separation:
+            #Test case, show d-separation is working as it should by showing that it returns the same (pruned) BN and CPTs as were calculated by hand and described in the report
+            #The answer should be True/Yes/is d-separated, and the node "Wet Grass?" and the edges between "Winter?" and "Rain?" and between "Winter?" and "Sprinkler" should be deleted
+            bnreasoner = BNReasoner_(file)    
+            X = ["Sprinkler?"]
+            Y = ["Slippery Road?"]
+            Z = ["Winter?"]
+            d_sep = bnreasoner.d_separation(X,Y,Z)
+            if d_sep:
+                print(d_sep,", ", X, "is d-separated from ", Y, "by ", Z)
+            else:
+                print(d_sep,", ", X, "is not d-separated from ", Y, "by ", Z)
+
+        if Independence:
+            
+            bnreasoner = BNReasoner_(file)
+            #Test whether “Wet Grass?” is independent from “Slippery Road?” given “Rain?". We computed by 
+            #hand that this query should result in True, “Wet Grass” is independent form “Slippery Road?” given “Rain?”
+            X = ["Wet Grass?"]
+            Y = ["Slippery Road?"]
+            Z = ["Rain?"] 
+            if bnreasoner.independence(X,Y,Z):
+                print(X, "is independent from ", Y, "given ", Z)
+            else:
+                print(X, "is not independent from ", Y, "given ", Z)
+
+        if Marginalization:
+            #Test case, the resulting CPT for "Rain?" summed-out of the CPT of "Wet Grass?" should be equal to: 
+            # Sprinkler?  Wet Grass?     P
+            # True        	True  	0.9+0.95 = 1.85
+            # True      	False  	0.05+0.1=0.15
+            # False        	True	0.8+0 = 0.80
+            # False       	False  	0.2+ 1 = 1.20
+            #
+
+            bnreasoner = BNReasoner_(file)
+            X = "Rain?"
+            cpt = BayesNet.get_cpt(bnreasoner.bn,"Wet Grass?")
+            print(bnreasoner.marginalization(cpt, X))
+
+        if MaxingOut:
+            #Test case, the resulting CPT for "Rain?" maxed-out of the CPT of "Rain?" should be equal to: 
+            # Winter?	P	
+            # True		0.8	Rain? = True
+            # False		0.9	Rain? = False
+            bnreasoner = BNReasoner_(file)
+            X = "Rain?"
+            cpt = BayesNet.get_cpt(bnreasoner.bn,X)
+            print(bnreasoner.maxing_out(cpt,X))
+        
+        if MultiplyFactor:
+            #To show the multiplication function works we calculate the multiplication of the factors of “Sprinkler?” and “Rain?” by hand, which resulted in: 
+            # Winter?	Sprinkler? 	Rain?		P
+            # True		True		True		0.16
+            # True		True		False		0.04
+            # True		False		True		0.64
+            # True		False		False		0.16
+            # False		True		True		0.075
+            # False		True		False		0.675
+            # False		False		True		0.025
+            # False		False		False		0.225
+            #This should be/is equal to the result printed, when the following you run the following:
+
+            bnreasoner = BNReasoner_(file)
+            X = 'Sprinkler?'
+            Y = 'Rain?'
+            cpt_1 = BayesNet.get_cpt(bnreasoner.bn, X)
+            cpt_2 = BayesNet.get_cpt(bnreasoner.bn,Y)
+            print(bnreasoner.multiply_factors(cpt_1,cpt_2)) 
+            
+        if Ordering:
+            #Test case: For  both orderings the ordering should always start with “Slippery Road?” the order of the other variables 
+            #does not matter, are all valid, as after “Slippery Road?” is removed, they all have 2 edges and would all add one edge when removed.  
+            bnreasoner = BNReasoner_(file)
+            Set = bnreasoner.bn.get_all_variables()
+            print(bnreasoner.minimum_degree_ordering( Set))
+            print(bnreasoner.minimum_fill_ordering(Set))
+
+        if Variable_Elimination:
+            #Test case: The returned CPT should be equivalent to the by hand calculated CPT on which variable elimination is applied. Eliminating the variables:
+            #"Winter?", "Rain?", "Wet Grass?" and "Sprinkler?”. This resulted in the hand calculated CPT:
+            #“Slippery Road?”	p
+            # True			0.364
+            # False			0.636
+            bnreasoner = BNReasoner_(file)
+            Set = ["Winter?", "Rain?", "Wet Grass?","Sprinkler?"]
+            print(bnreasoner.variable_elimination(bnreasoner.bn.get_all_cpts(), to_sum_out_vars=Set))
+            
+        if Marginal_distribution:
+            #Test case: With Q = “Winter?” and “Rain?”, and with evidence e = “Sprinkler?” : True, the hand calculated CPT that needs to be returned is for the prior marginal: 
+            # Rain?  Winter?     P
+            # True     True  0.48
+            # False     True  0.12
+            # True    False  0.04
+            # False    False  0.36 
+            # and for the posterior marginal:
+            # Winter?  Rain?         P
+            # True   	True 	0.228571
+            # True 	False  	0.057143
+            # False   	True  	0.071429
+            # False  	False  	0.642857
+            #Which should be equal to the CPTs that are returned below
+
+            bnreasoner = BNReasoner_(file)
+            #q = ["Winter?", "Rain?"]
+            #evidence = {"Sprinkler?": True}
+            current_time = time.time()
+            marg_evi = bnreasoner.marginal_distribution(Queri, evidence, order='minimum_degree_ordering')
+            elapsed_time = time.time()
+            result_marginal['data_degree'].append(elapsed_time - current_time)
+            
+            current_time = time.time()
+            marg_evi = bnreasoner.marginal_distribution(Queri, evidence, order='minimum_fill_ordering')
+            elapsed_time = time.time()
+            result_marginal['data_fill'].append(elapsed_time - current_time)
+            
+            #marg_q = bnreasoner.marginal_distribution(Queri)
+
+            #print("Posterior Marginal:")
+            #print(bnreasoner.marginal_distribution(q,evidence))
+            #print("Prior Marginal:")
+            #print(bnreasoner.marginal_distribution(q))
+            
+        if Map:
+            # Test case: Given the BN, which can also be found in the provided lecture_example2.BIFXML and the query 
+            # given in example 2 on slides 20-21 of the fourth Bayes’ lecture. Our implementation of MAP 
+            # returns the values for J and I, given O = True, namely, J = False, I = False, but as the 
+            # values for J = False, I = True and J = False, I = False are the same both instantiation
+            # give a correct result.
+            #bnreasoner = BNReasoner_("testing/lecture_example2.BIFXML")
+            #q = ["I", "J"]
+            #evidence = {"O":True}    
+            #print(bnreasoner.map(q,evidence))
+
+            bnreasoner = BNReasoner_(file)
+
+            current_time = time.time()
+            map_evi = bnreasoner.map(Queri, evidence, order='minimum_degree_ordering')
+            elapsed_time = time.time()
+            result_map['data_degree'].append(elapsed_time - current_time)
+
+            current_time = time.time()
+            map_evi = bnreasoner.map(Queri, evidence, order='minimum_fill_ordering')
+            elapsed_time = time.time()
+            result_map['data_fill'].append(elapsed_time - current_time)
+
+        if Mpe:
+            # Test case: Given the BN, which can also be found in the provided lecture_example2.BIFXML and 
+            # the query given in example 1 on slides 18-19 of the fourth Bayes’ lecture. Our implementation 
+            # of MPE should return the same probability and extended factor (and it does)
+            #
+            #bnreasoner = BNReasoner_("testing/lecture_example2.BIFXML")
+            bnreasoner = BNReasoner_(file)
+            #evidence = {"O": False, "J": True}
+            
+            elapsed_time = time.time()
+            mpe_evi = bnreasoner.mpe(evidence, ordering='minimum_degree_ordering')
+            elapsed_time = time.time()
+            result_mpe['data_degree'].append(elapsed_time - current_time)
+
+            elapsed_time = time.time()
+            mpe_evi = bnreasoner.mpe(evidence, ordering='minimum_fill_ordering')
+            elapsed_time = time.time()
+            result_mpe['data_fill'].append(elapsed_time - current_time)
+
+
+    #print(data_to_plot)
+
+    '''
+    result_marginal = {'data_fill':[], 'data_degree':[]}
+    result_map = {'data_fill':[], 'data_degree':[]}
+    result_mpe = {'data_fill':[], 'data_degree':[]}
+
+    result_marginal['data_fill'] = [0,0]
+    result_marginal['data_degree'] = [1,0]
+    result_map['data_fill'] = [0,0]
+    result_map['data_degree'] = [0,2]
+    result_mpe['data_fill'] = [0,0]
+    result_mpe['data_degree'] = [3,0]
+    '''
+
+
+    total = pd.DataFrame()
+    data = [result_marginal, result_map, result_mpe]
+    names = ['marginal', 'MAP', 'MPE']
+    for method in range(len(data)):
+        #print(data[method]["data_fill"])
+        df_fill = pd.DataFrame(data[method]["data_fill"], columns=['values'])
+        df_fill['type']='fill'
+        df_degree = pd.DataFrame(data[method]["data_degree"], columns=['values'])
+        df_degree['type']='degree'
+        df_new = pd.concat([df_fill, df_degree])
+        df_new['label'] = names[method]
+        total = pd.concat([total, df_new])
+
+        '''
+
+        result_values = pd.DataFrame(data[method], columns='values')
+        result_values['type'] = names[method]
+        total = pd.concat([total, result_values])
+
+        result = pd.DataFrame(value['data_degree'], columns=['values'])
+        result['type'] = 'Minimum degree'
+        df_x = pd.DataFrame(value['data_fill'], columns=['values'])
+        df_x['type']='Minimum fill'
+        df = pd.concat([result, df_x])
+        df['label'] = value["label"]
+        total = pd.concat([total, df])
+        '''
+    #print(total)
+    fig = plt.figure(figsize=(6,5))    
+    fig.set_dpi(1200)
+    sns.set()
+    sns.boxplot(y="values", x="label", data=total, hue='type')
+
+    query_text = ""
+    if len(Queri)>1:
+        query_text = "Big query with"
     else:
-        print(d_sep,", ", X, "is not d-separated from ", Y, "by ", Z)
+        query_text = "Small query with"
 
-if Independence:
-    
-    bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
-    #Test whether “Wet Grass?” is independent from “Slippery Road?” given “Rain?". We computed by 
-    #hand that this query should result in True, “Wet Grass” is independent form “Slippery Road?” given “Rain?”
-    X = ["Wet Grass?"]
-    Y = ["Slippery Road?"]
-    Z = ["Rain?"] 
-    if bnreasoner.independence(X,Y,Z):
-        print(X, "is independent from ", Y, "given ", Z)
+    evidence_text = ""
+    if len(evidence)>1:
+        evidence_text = "a lot of evidence"
     else:
-        print(X, "is not independent from ", Y, "given ", Z)
+        evidence_text = "a small amount of evidence"
 
-if Marginalization:
-    #Test case, the resulting CPT for "Rain?" summed-out of the CPT of "Wet Grass?" should be equal to: 
-    # Sprinkler?  Wet Grass?     P
-    # True        	True  	0.9+0.95 = 1.85
-    # True      	False  	0.05+0.1=0.15
-    # False        	True	0.8+0 = 0.80
-    # False       	False  	0.2+ 1 = 1.20
-    #
+    plt.title(text_to_plot[iter])
+    plt.ylabel("Runtime (ms)")
+    plt.xlabel("Type")
+    #plt.legend()
 
-    bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
-    X = "Rain?"
-    cpt = BayesNet.get_cpt(bnreasoner.bn,"Wet Grass?")
-    print(bnreasoner.marginalization(cpt, X))
-
-if MaxingOut:
-    #Test case, the resulting CPT for "Rain?" maxed-out of the CPT of "Rain?" should be equal to: 
-    # Winter?	P	
-    # True		0.8	Rain? = True
-    # False		0.9	Rain? = False
-    bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
-    X = "Rain?"
-    cpt = BayesNet.get_cpt(bnreasoner.bn,X)
-    print(bnreasoner.maxing_out(cpt,X))
-   
-if MultiplyFactor:
-    #To show the multiplication function works we calculate the multiplication of the factors of “Sprinkler?” and “Rain?” by hand, which resulted in: 
-    # Winter?	Sprinkler? 	Rain?		P
-    # True		True		True		0.16
-    # True		True		False		0.04
-    # True		False		True		0.64
-    # True		False		False		0.16
-    # False		True		True		0.075
-    # False		True		False		0.675
-    # False		False		True		0.025
-    # False		False		False		0.225
-    #This should be/is equal to the result printed, when the following you run the following:
-
-    bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
-    X = 'Sprinkler?'
-    Y = 'Rain?'
-    cpt_1 = BayesNet.get_cpt(bnreasoner.bn, X)
-    cpt_2 = BayesNet.get_cpt(bnreasoner.bn,Y)
-    print(bnreasoner.multiply_factors(cpt_1,cpt_2)) 
-    
-if Ordering:
-    #Test case: For  both orderings the ordering should always start with “Slippery Road?” the order of the other variables 
-    #does not matter, are all valid, as after “Slippery Road?” is removed, they all have 2 edges and would all add one edge when removed.  
-    bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
-    Set = bnreasoner.bn.get_all_variables()
-    print(bnreasoner.minimum_degree_ordering( Set))
-    print(bnreasoner.minimum_fill_ordering(Set))
-
-if Variable_Elimination:
-    #Test case: The returned CPT should be equivalent to the by hand calculated CPT on which variable elimination is applied. Eliminating the variables:
-    #"Winter?", "Rain?", "Wet Grass?" and "Sprinkler?”. This resulted in the hand calculated CPT:
-    #“Slippery Road?”	p
-    # True			0.364
-    # False			0.636
-    bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
-    Set = ["Winter?", "Rain?", "Wet Grass?","Sprinkler?"]
-    print(bnreasoner.variable_elimination(bnreasoner.bn.get_all_cpts(), to_sum_out_vars=Set))
-    
-if Marginal_distribution:
-    #Test case: With Q = “Winter?” and “Rain?”, and with evidence e = “Sprinkler?” : True, the hand calculated CPT that needs to be returned is for the prior marginal: 
-    # Rain?  Winter?     P
-    # True     True  0.48
-    # False     True  0.12
-    # True    False  0.04
-    # False    False  0.36 
-    # and for the posterior marginal:
-    # Winter?  Rain?         P
-    # True   	True 	0.228571
-    # True 	False  	0.057143
-    # False   	True  	0.071429
-    # False  	False  	0.642857
-    #Which should be equal to the CPTs that are returned below
-
-    bnreasoner = BNReasoner_("testing/lecture_example.BIFXML")
-    q = ["Winter?", "Rain?"]
-    evidence = {"Sprinkler?": True}
-    
-    print("Posterior Marginal:")
-    print(bnreasoner.marginal_distribution(q,evidence))
-    print("Prior Marginal:")
-    print(bnreasoner.marginal_distribution(q))
-    
-if Map:
-    # Test case: Given the BN, which can also be found in the provided lecture_example2.BIFXML and the query 
-    # given in example 2 on slides 20-21 of the fourth Bayes’ lecture. Our implementation of MAP 
-    # returns the values for J and I, given O = True, namely, J = False, I = False, but as the 
-    # values for J = False, I = True and J = False, I = False are the same both instantiation
-    # give a correct result.
-    bnreasoner = BNReasoner_("testing/lecture_example2.BIFXML")
-    q = ["I", "J"]
-    evidence = {"O":True}    
-    print(bnreasoner.map(q,evidence))
-    
-if Mpe:
-    # Test case: Given the BN, which can also be found in the provided lecture_example2.BIFXML and 
-    # the query given in example 1 on slides 18-19 of the fourth Bayes’ lecture. Our implementation 
-    # of MPE should return the same probability and extended factor (and it does)
-    #
-    bnreasoner = BNReasoner_("testing/lecture_example2.BIFXML")
-    evidence = {"O": False, "J": True}
-    print(bnreasoner.mpe(evidence))
+    # Create the output folder if it doesn't exist
+    output_folder = "output/"
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+    #plt.show()
+    output_file = output_folder + f"boxplot_{text_to_plot[iter]}_.png"
+    print(output_file)
+    #plt.tight_layout()
+    plt.savefig(output_file)
+    plt.clf()
