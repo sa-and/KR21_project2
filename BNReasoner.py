@@ -42,13 +42,8 @@ class BNReasoner:
                 for child in bayes_net.get_children(a): # Check if the removed node has children, if yes delete edge
                     bayes_net.del_edge((a, child)) # Delete edge if input variable has child
                     finished = True
-<<<<<<< Updated upstream
-        # print(p.get_all_cpts()," dit is p")
-        return p
-=======
         print(bayes_net.get_all_cpts()," dit is p")
         return bayes_net
->>>>>>> Stashed changes
 
     def d_separation(self, x: List[str], y: List[str], z: List[str]) -> bool:
         bayes_net = deepcopy(self.bn)
@@ -110,17 +105,7 @@ class BNReasoner:
             order_edges.append((node, i)) 
         return [x[0] for x in sorted(order_edges, key=lambda x: x[1])] # Sort the list and return only the variable name
 
-<<<<<<< Updated upstream
-    def init_factor(self,variables: List[str], value=0) -> pd.DataFrame:
-        """
-        Generate a default CPT.
-        :param variables:   Column names
-        :param value:       Which the default p-value should be
-        :return:            A CPT
-        """
-=======
     def init_factor(self, variables: List[str], value=0) -> pd.DataFrame:
->>>>>>> Stashed changes
         truth_table = product([True, False], repeat=len(variables))
         factor = pd.DataFrame(truth_table, columns=variables)
         factor['p'] = value
@@ -173,33 +158,6 @@ class BNReasoner:
 
         return res_factor.reset_index(drop=True)
 
-    def factor_multiplication(self,f,g):
-        '''
-        Given two factors f and g, compute the multiplied factor h=fg
-        :param f: Factor f
-        :param g: Factor g
-        :returns: Multiplied factor h=f*g
-        '''
-
-        # check what the overlapping var(s) is
-        vars_f = [x for x in f.columns]
-        vars_g = [x for x in g.columns]
-
-        for var in vars_f:
-            if var in vars_g and var != 'p':
-                join_var = var
-
-        # merge two dataframes
-        merged = f.merge(g,left_on=join_var,right_on=join_var)
-
-        # multiply probabilities
-        merged['p'] = merged['p_x']*merged['p_y']
-
-        # drop individual probability columns
-        h = merged.drop(['p_x','p_y'],axis=1)
-
-        # return h
-        return h
 
     def factor_multiplication(self, factors: List[Union[str, pd.DataFrame]]) -> pd.DataFrame:
         # If there are strings in the input-list of factors, replace them with the corresponding cpt
@@ -258,13 +216,13 @@ class BNReasoner:
             # Pop all functions from S, which mention var_pi...
             func_k = [S.pop(key) for key, cpt in deepcopy(S).items() if var_pi in cpt]
 
-            new_factor = self.multiply_factors(func_k) if len(func_k) > 1 else func_k[0]
+            new_factor = self.factor_multiplication(func_k) if len(func_k) > 1 else func_k[0]
             new_factor = self.maximise_out(new_factor, var_pi)
 
             # And replace them with the new factor
             S[var_pi] = new_factor
 
-        res_factor = self.multiply_factors(list(S.values())) if len(S) > 1 else S.popitem()[1]
+        res_factor = self.factor_multiplication(list(S.values())) if len(S) > 1 else S.popitem()[1]
         return res_factor
 
     def MAP(self, M: List[str], evidence: pd.Series, order_func: str = None) -> pd.DataFrame:
@@ -304,90 +262,6 @@ class BNReasoner:
         res_factor = self.factor_multiplication(list(S.values())) if len(S) > 1 else S.popitem()[1]
         return res_factor
 
-<<<<<<< Updated upstream
-    # def maximise_out(self, factor: Union[str, pd.DataFrame], subset: Union[str, list]) -> pd.DataFrame:
-    #     """
-    #     :param factor:
-    #     :param subset:
-    #     :return:
-    #     """
-    #     if isinstance(factor, str):
-    #         factor = self.bn.get_cpt(factor)
-    #     if isinstance(subset, str):
-    #         subset = [subset]
-
-    #     # Copy the factor, drop the variable(s) to be maximized, the extensions and 'p' and drop all duplicates to get
-    #     # each possible instantiation.
-    #     ext = [c for c in factor.columns if c[:3] == 'ext']
-    #     instantiations = deepcopy(factor).drop(subset + ext + ['p'], axis=1).drop_duplicates()
-    #     res_factor = pd.DataFrame(columns=factor.columns)
-
-    #     if len(instantiations.columns) == 0:
-    #         try:
-    #             res_factor = res_factor.append(factor.iloc[factor['p'].idxmax()])
-    #         except IndexError:
-    #             print('w')
-    #     else:
-    #         for _, instantiation in instantiations.iterrows():
-    #             cpt = self.bn.get_compatible_instantiations_table(instantiation, factor)
-    #             res_factor = res_factor.append(factor.iloc[cpt['p'].idxmax()])
-
-    #     # For each maximized-out variable(s), rename them to ext(variable)
-    #     for v in subset:
-    #         x = res_factor.pop(v)
-    #         res_factor[f'ext({v})'] = x
-
-    #     return res_factor.reset_index(drop=True)
-
-    # def init_factor(self, variables: List[str], value=0) -> pd.DataFrame:
-    #     """
-    #     Generate a default CPT.
-    #     :param variables:   Column names
-    #     :param value:       Which the default p-value should be
-    #     :return:            A CPT
-    #     """
-    #     print(variables)
-    #     truth_table = product([True, False], repeat=len(variables))
-    #     factor = pd.DataFrame(truth_table, columns=variables)
-    #     factor['p'] = value
-    #     return factor
-
-    # def sum_out_factors(self, factor: Union[str, pd.DataFrame], subset: Union[str, list]) -> pd.DataFrame:
-    #     """
-    #     Sum out some variable(s) in subset from a factor.
-    #     :param factor:  factor over variables X
-    #     :param subset:  a subset of variables X
-    #     :return:        a factor corresponding to the factor with the subset summed out
-    #     """
-    
-    #     if isinstance(factor, str):
-    #         factor = self.bn.get_cpt(factor)
-    #     if isinstance(subset, str):
-    #         subset = [subset]
-
-    #     new_factor = factor.drop(subset + ['p'], axis=1).drop_duplicates()
-    #     new_factor['p'] = 0
-    #     subset_factor = self.init_factor(subset)
-
-    #     for i, y in new_factor.iterrows():
-    #         for _, z in subset_factor.iterrows():
-    #             new_factor.loc[i, 'p'] = new_factor.loc[i, 'p'] + self.bn.get_compatible_instantiations_table(
-    #                 y[:-1].append(z[:-1]), factor)['p'].sum()
-    #             # sum() instead of float() here, since the compatible table can be empty at times, this works around it
-
-    #     return new_factor.reset_index(drop=True)
-    
-    def elimination(self, data: pd.DataFrame, var: List[str]) -> pd.DataFrame:
-        """ Sum out a set of variables by using variable elimination
-
-        Args:
-            data (pd.Dataframe): Dataframe of where elimination should take place
-            var (List): Variable to be summed out
-            
-        Returns:
-            pd.Dataframe: Dataframe after elimination
-        """
-=======
     def compute_marginal(self, query: List[str], evidence: pd.Series = None, order: List[str] = None) -> pd.DataFrame:
         if order is None:
             order = self.random_order()
@@ -421,8 +295,19 @@ class BNReasoner:
         return res_factor
 
     def elimination(self, data: pd.DataFrame, var: List[str]) -> pd.DataFrame:
->>>>>>> Stashed changes
+<<<<<<< Updated upstream
+        """ Sum out a set of variables by using variable elimination
+
+        Args:
+            data (pd.Dataframe): Dataframe of where elimination should take place
+            var (List): Variable to be summed out
+            
+        Returns:
+            pd.Dataframe: Dataframe after elimination
+        """
+=======
         print(data, "initial dataframe")
+>>>>>>> Stashed changes
         remaining = data.drop(columns=var) # Drop column thats need to be summed out
         rem_list = list(remaining.columns.values)[:-1] # Get remaining dataframe
         if len(rem_list) == 0: # If empty return empty frame
@@ -432,6 +317,7 @@ class BNReasoner:
             rem_list).aggregate({'p': 'sum'})
         eliminated.reset_index(inplace=True)
         return eliminated
+
 
     def loop_over_children(self,bn, y, parent):
       # print("parent: ", parent)
@@ -447,19 +333,8 @@ class BNReasoner:
                     if not self.loop_over_children(bn, y, child):
                         return False
             return True 
-<<<<<<< Updated upstream
-            
-    def independence(self, bn, X, Y, Z):
-        '''
-        Implementation of Markov Property and Symmetry in DAGS to determine independence
-        :param bn: Bayesian Network
-        :param X, Y, Z: sets of variable of which to decide whether X is independent of Y given Z
-        :returns: Bool, True if X and Y are independent given Z, False if X and Y are not independent given Z 
-        '''
-=======
 
     def check_independence(self, bn, X, Y, Z):
->>>>>>> Stashed changes
         Not_all_parents_of_X = False        
         for x in X: 
             for parent in BayesNet.get_all_variables(bn):
@@ -491,4 +366,3 @@ class BNReasoner:
                     return False
                      
         return True 
-
