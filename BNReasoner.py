@@ -316,7 +316,10 @@ class BNReasoner:
             fname = self._get_factor_name(cpt)
             for neighbor in neighbors:
                 self.bn.del_var(neighbor)
-            self.bn.add_var(fname, cpt)
+            if fname in self.bn.get_all_variables():
+                self.bn.update_cpt(fname, cpt)
+            else:
+                self.bn.add_var(fname, cpt)
 
     @staticmethod
     def _get_factor_name(cpt: pd.DataFrame):
@@ -521,18 +524,13 @@ def test_dsep():
     assert not reasoner.dsep({'Lung Cancer?'}, {'Smoker?'}, set())
 
 def profile_ve():
-    # reasoner = BNReasoner('testing/rand_bn_nodes_15_0.BIFXML')
-    # # Q = {'0', '2'}
-    # # e = pd.Series({'1': True, '4': True})
-    # # print(reasoner.map(Q, e))
-    # print(reasoner.map({'1', '2', '10'}, pd.Series(dtype=object)))
-    reasoner = BNReasoner('testing/rand_bn_nodes_10_0.BIFXML')
+    reasoner = BNReasoner('parkinsons.BIFXML')
     Q = {'Parkinsons?', 'Hospital?'}
     e = pd.Series({'Physica examination?': True, 'Treatment?': True, 'Tremor?': True, 'Age?': True, 'Hereditary disease?': True})
     print(reasoner.map(Q, e, elim_method='min_fill'))
 
 def main():
-    profile_ve()
+    cProfile.run('profile_ve()')
 
 if __name__ == '__main__':
     main()
