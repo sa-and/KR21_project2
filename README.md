@@ -1,5 +1,27 @@
-# Useful Pointers for Assignment 2 of KR21
 
+######### How to run the code ############
+
+# PART 1
+
+1. Run "python test.py"
+2. For all methods the condition is True. If you want to run for specific helper method then make the other varibles false. 
+
+
+# Part 2 
+
+1. generate_bn.py is used to create random baysian networks.
+2. folder testing->Part_2 consists of random baysian network part 2 was tested on. 
+3. to run the script to get the runtime of MAP and MPE for 3 different heuristics, run "python Part2.py" which will dump 2 excel in output folder. 
+
+# Part 3 
+
+1. run "python use_case.py"
+
+
+
+
+
+# Useful Pointers for Assignment 2 of KR21
 ## BIFXML file format
 The BIFXML file format is meant to provide an easy means of exchanging Bayesian networks. It works with standard XML
 tags. The detailed description of the format can be found at 
@@ -88,3 +110,4 @@ Beware that the returned value is always a tuple of (row_number, row_content).
 ## Networkx methods
 It is likely, that you will not have to use this package at all. One possible methods that could be useful is 
 `networkx.neighbors(G, var)` which provides a list of all neighbors of the variable 'var' in the graph 'G'.
+
