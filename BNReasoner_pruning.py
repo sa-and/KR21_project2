@@ -8,7 +8,8 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 import os
-
+import pickle
+import scipy.stats as stats
 print("Finished importing")
 
 class BNReasoner_:
@@ -580,6 +581,7 @@ class BNReasoner_:
 
         return n  
 
+# Setup of the settings to run the experiment
 Pruning = False
 check_d_separation = False
 Independence = False
@@ -594,21 +596,19 @@ Mpe = True
 
 #file = "testing/lecture_example.BIFXML"
 file = "testing/usecase.BIFXML"
-#Queri, evidence = ["Wet Grass?"], {"Rain?": False, "Winter?": True}
-#Queri, evidence = ['liver-biopsy'], {"hepatitis":True, "cirrhosis":False, 'metastases':True}
-
+output_folder = "output/"
 trials = 1000
 qs = [
-    ['hepatitis'],
-    ['hepatitis'],
+    ['genetic-predisposition-cancer'],
+    ['genetic-predisposition-cancer'],
     ['genetic-predisposition-cancer'],
     ['genetic-predisposition-cancer']
 ]
 es = [
-    {"liver-cancer":True},
-    {"liver-cancer":True, "liver-biopsy":False, "cirrhosis":True, "jaundice":True, "excessive-alcohol-use":True},
+    {"breast-cancer":True},
+    {"liver-cancer":True, "breast-cancer":False, "colon-cancer":True, "metastases":True},#, "excessive-alcohol-use":True},
     {"cirrhosis":False},
-    {"hepatitis":True, "jaundice":False, "excessive-alcohol-use":True, "liver-biopsy":False}
+    {"hepatitis":True, "jaundice":False, "excessive-alcohol-use":True, "liver-biopsy":False,"cirrhosis":False}
 ]
 text_to_plot = [
     "1 related evidence",
@@ -616,8 +616,10 @@ text_to_plot = [
     "1 unrelated evidence",
     "all unrelated evidence"
 ]
+everything_combined = []
 
 for iter in range(len(qs)):
+    print(f"Currently checking: {text_to_plot[iter]}")
     Queri, evidence = qs[iter], es[iter]
 
     result_marginal = {'data_fill':[], 'data_degree':[]}
@@ -626,7 +628,8 @@ for iter in range(len(qs)):
 
     for trial_number in range(trials):
         if trial_number % 10 == 0:
-            print(f"Trail: {trial_number}")
+            #print(f"Trail: {trial_number}")
+            pass
         if Pruning:
             #Test case, show pruning is working as it should by showing that it returns the same (pruned) BN and CPTs as slide 31 of the third Bayes' lecture
             bnreasoner = BNReasoner_(file)
@@ -799,23 +802,7 @@ for iter in range(len(qs)):
             elapsed_time = time.time()
             result_mpe['data_fill'].append(elapsed_time - current_time)
 
-
-    #print(data_to_plot)
-
-    '''
-    result_marginal = {'data_fill':[], 'data_degree':[]}
-    result_map = {'data_fill':[], 'data_degree':[]}
-    result_mpe = {'data_fill':[], 'data_degree':[]}
-
-    result_marginal['data_fill'] = [0,0]
-    result_marginal['data_degree'] = [1,0]
-    result_map['data_fill'] = [0,0]
-    result_map['data_degree'] = [0,2]
-    result_mpe['data_fill'] = [0,0]
-    result_mpe['data_degree'] = [3,0]
-    '''
-
-
+    # Merge the runtimes and place them in boxplots
     total = pd.DataFrame()
     data = [result_marginal, result_map, result_mpe]
     names = ['marginal', 'MAP', 'MPE']
@@ -829,20 +816,9 @@ for iter in range(len(qs)):
         df_new['label'] = names[method]
         total = pd.concat([total, df_new])
 
-        '''
+        print(f"T-Test for method {names[method]}:")
+        print(stats.ttest_ind(data[method]["data_fill"],data[method]["data_degree"]))
 
-        result_values = pd.DataFrame(data[method], columns='values')
-        result_values['type'] = names[method]
-        total = pd.concat([total, result_values])
-
-        result = pd.DataFrame(value['data_degree'], columns=['values'])
-        result['type'] = 'Minimum degree'
-        df_x = pd.DataFrame(value['data_fill'], columns=['values'])
-        df_x['type']='Minimum fill'
-        df = pd.concat([result, df_x])
-        df['label'] = value["label"]
-        total = pd.concat([total, df])
-        '''
     #print(total)
     fig = plt.figure(figsize=(6,5))    
     fig.set_dpi(1200)
@@ -864,15 +840,29 @@ for iter in range(len(qs)):
     plt.title(text_to_plot[iter])
     plt.ylabel("Runtime (ms)")
     plt.xlabel("Type")
-    #plt.legend()
 
     # Create the output folder if it doesn't exist
-    output_folder = "output/"
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
-    #plt.show()
+    
     output_file = output_folder + f"boxplot_{text_to_plot[iter]}_.png"
     print(output_file)
-    #plt.tight_layout()
     plt.savefig(output_file)
     plt.clf()
+
+    everything_combined.append(total)
+
+''' # If needed, dump all information to a pickle.
+# Dump all information into a file
+myFile = open(output_folder+'data.pkl', 'wb')
+pickle.dump(total, myFile)
+myFile.close()
+
+# Retrieve the data from the dumped file
+lala = open(output_folder+'data.pkl', 'rb')
+gggg = pickle.load(lala)
+lala.close()
+
+# If the data has to be displayed:
+#print(gggg)
+'''
