@@ -396,21 +396,10 @@ class BNReasoner:
         self._reduce_all_factors(e)
         self.variable_elimination(vars_to_keep) # elminate all variables we don't need
         q_assignments = {}
+        table = self.multiply_all_tables()
         for var in Q:
-            list_childeren = self.bn.get_children(var)
-            for child in list_childeren: 
-                multiply_table  = self.factor_mult(var, child)
-                self.bn.update_cpt(child, multiply_table)
-                table, assignments =  self.maxing_out(child, var)
-                q_assignments[var] = assignments
-                self.bn.update_cpt(child, table)
-                
-            if len(list_childeren) == 0:
-                table, assignments = self.maxing_out(var, var)
-                q_assignments[var] = assignments
-                self.bn.update_cpt(var,table)
-            else:
-                self.bn.del_var(var)
+            table, assignments = self._maxing_out(table, var)
+            q_assignments[var] = assignments
         final = {}
         i = assignments.index.values[0]
         for q, a in q_assignments.items():
@@ -436,7 +425,7 @@ def profile_ve():
     reasoner = BNReasoner('parkinsons.BIFXML')
     Q = {'Parkinsons?', 'Hospital?'}
     e = pd.Series({'Physical examination?': True, 'Treatment?': True, 'Tremor?': True, 'Age?': True, 'Hereditary disease?': True})
-    print(reasoner.mpe(Q, e, elim_method='min_degree'))
+    print(reasoner.mpe(e))
 
 def main():
     # cProfile.run('profile_ve()')
