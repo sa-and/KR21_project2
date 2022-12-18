@@ -343,7 +343,7 @@ class BNReasoner:
     def _reduce_all_factors(self, e: pd.Series):
         for var in self.bn.get_all_variables():
             cpt = self.bn.get_cpt(var)
-            cpt = BayesNet.reduce_factor(e, cpt)
+            cpt = BayesNet.get_compatible_instantiations_table(e, cpt)
             self.bn.update_cpt(var, cpt)
     
     def marginal_distribution(self, Q: set[str], e: pd.Series, elim_method='min_degree'):
@@ -389,6 +389,7 @@ class BNReasoner:
         #Start with edge pruning and node pruning 
         #Get elimination order
         #maximize out for order 
+        breakpoint()
         e_vars = set(e.index)
         Q = set(self.bn.get_all_variables()) - e_vars
         self.prune(Q,e)
@@ -400,6 +401,7 @@ class BNReasoner:
         for var in Q:
             table, assignments = self._maxing_out(table, var)
             q_assignments[var] = assignments
+        breakpoint()
         final = {}
         i = assignments.index.values[0]
         for q, a in q_assignments.items():
@@ -423,8 +425,8 @@ class BNReasoner:
 
 def profile_ve():
     reasoner = BNReasoner('parkinsons.BIFXML')
-    Q = {'Parkinsons?', 'Hospital?'}
-    e = pd.Series({'Physical examination?': True, 'Treatment?': True, 'Tremor?': True, 'Age?': True, 'Hereditary disease?': True})
+    # Q = {'Treatment?'}
+    e = pd.Series({'Parkinsons?': True})
     print(reasoner.mpe(e))
 
 def main():
