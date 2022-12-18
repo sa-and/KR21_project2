@@ -389,7 +389,6 @@ class BNReasoner:
         #Start with edge pruning and node pruning 
         #Get elimination order
         #maximize out for order 
-        breakpoint()
         e_vars = set(e.index)
         Q = set(self.bn.get_all_variables()) - e_vars
         self.prune(Q,e)
