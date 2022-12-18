@@ -400,7 +400,6 @@ class BNReasoner:
         for var in Q:
             table, assignments = self._maxing_out(table, var)
             q_assignments[var] = assignments
-        breakpoint()
         final = {}
         i = assignments.index.values[0]
         for q, a in q_assignments.items():
