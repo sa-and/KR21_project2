@@ -91,14 +91,14 @@
       <FOR>Tremor?</FOR>
       <GIVEN>Hereditary disease?</GIVEN>
       <GIVEN>Age?</GIVEN>
-      <TABLE>0.995 0.005 0.99 0.01 0.02 0.98 0.94 0.06</TABLE>
+      <TABLE>0.995 0.005 0.99 0.01 0.98 0.02 0.94 0.06</TABLE>
     </DEFINITION>
     <DEFINITION>
       <FOR>Parkinsons?</FOR>
       <GIVEN>Tremor?</GIVEN>
       <GIVEN>Hereditary disease?</GIVEN>
       <GIVEN>Age?</GIVEN>
-      <TABLE>0.6 0.4 0.3 0.7 0.45 0.55 0.12 0.88 0.25 0.75 0.08 0.92 0.18 0.82 0.02 0.98</TABLE>
+      <TABLE>0.98 0.02 0.82 0.18 0.92 0.08 0.75 0.25 0.88 0.12 0.55 0.45 0.7 0.3 0.4 0.6</TABLE>
     </DEFINITION>
     <DEFINITION>
       <FOR>Side effects?</FOR>
